@@ -1,71 +1,289 @@
-# React + TypeScript + Vite
+# Classroom Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A classroom management and student display dashboard designed for teachers who want one place to organize daily lessons, seating charts, warm-ups, learning targets, homework, and classroom instructions.
 
-Currently, two official plugins are available:
+The application runs in a web browser and uses Cloudflare Workers and Cloudflare D1 to store classroom data.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Deploy Your Own Copy
 
-## React Compiler
+Each deployment creates an independent copy of the dashboard connected to its own Cloudflare resources.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/jayfeather1998-netizen/classroom-dashboard-template)
 
-## Expanding the ESLint configuration
+You will need:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- A free Cloudflare account
+- A GitHub account
+- A few minutes for the initial deployment
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Your classroom information is stored in your own D1 database. It is not shared with other installations of the dashboard.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Features
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Student Classroom Display
 
+The student-facing dashboard provides a single-screen classroom display containing:
+
+- Today's lesson
+- Learning target
+- When You Enter instructions
+- Homework
+- Warm-up
+- Seating chart
+- Current date and day of the week
+- Class period selector
+
+Each period has its own color theme so students can quickly identify the class being displayed.
+
+### Lesson Library
+
+Create reusable lessons containing:
+
+- Lesson name
+- Lesson code
+- Unit
+- Learning target
+- Instructions
+- Homework
+- Warm-up
+
+Lessons can be searched, sorted, filtered by subject or unit, and reused across multiple classes and dates.
+
+### Lesson Calendar
+
+The calendar allows you to:
+
+- Mark dates as A Days, B Days, or No School
+- Assign lessons to individual periods
+- Give different periods different lessons
+- Move lessons forward when your schedule changes
+- Shift an entire instructional day forward
+- Shift an individual period forward
+
+### Seating Charts
+
+Each class period has its own seating chart.
+
+The seating system supports:
+
+- Student roster management
+- Bulk roster importing
+- Randomized seating
+- Manual student swaps
+- Blocked/unavailable seats
+- Forbidden student pairs
+- Different numbers of groups
+- Different group sizes
+
+You can organize seating by either:
+
+**Number of groups**
+
+Example:
+
+> 28 students → 7 groups → 4 seats per group
+
+or:
+
+**Students per group**
+
+Example:
+
+> 30 students → groups of 6 → 5 groups
+
+The application automatically calculates the required seating capacity.
+
+### Teacher Mode
+
+Teacher Mode provides access to:
+
+- Subjects
+- Period configuration
+- Lesson Library
+- Lesson Calendar
+- Student rosters
+- Seating configuration
+- Forbidden pairs
+
+The student-facing display remains separate from these management tools.
+
+## Initial Setup
+
+After deploying your copy, open the dashboard and enter Teacher Mode.
+
+The starter configuration includes:
+
+### A Day
+
+- Period 1
+- Period 2
+- Period 3
+- Period 4
+
+### B Day
+
+- Period 6
+- Period 7
+- Period 8
+- Period 9
+
+These periods can be configured as classes or prep periods.
+
+The starter subjects are:
+
+- Math 8
+- Algebra
+
+You can add your own subjects and change the subject assigned to each period.
+
+## Setting Up Your Classes
+
+A recommended setup order is:
+
+1. Open **Teacher Mode**.
+2. Configure your subjects.
+3. Configure each class period.
+4. Open **Seating** and import your student rosters.
+5. Configure the seating layout for each class.
+6. Add lessons to the **Lesson Library**.
+7. Open the **Lesson Calendar** and mark your school days.
+8. Assign lessons to your classes.
+9. Return to **Student Display**.
+
+## Importing a Roster
+
+The roster importer accepts names in this format:
+
+```text
+Last, First
+Last, First
+Last, First
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+For example:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```text
+Smith, Jordan
+Garcia, Maya
+Johnson, Alex
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
+The dashboard converts these to student-display names such as:
+
+```text
+Jordan S.
+Maya G.
+Alex J.
+```
+
+Only the student's first name and last initial are stored by the dashboard.
+
+## Flexible Seating
+
+Seating layouts are configured independently for each class period.
+
+You can choose to control either the number of groups or the desired number of students per group.
+
+The dashboard then calculates the other value based on the size of the roster.
+
+Seats may also be blocked when a physical seat is unavailable.
+
+Forbidden pairs can be created for students who should not be placed in the same group. The random seating generator will attempt to create a valid arrangement that respects those restrictions.
+
+## Classroom Schedule
+
+The dashboard uses an A/B schedule.
+
+School days are explicitly selected on the Lesson Calendar rather than automatically alternating. This allows the calendar to handle holidays, professional-development days, weather closures, and other schedule interruptions without throwing off the rotation.
+
+## Data Storage
+
+Classroom data is stored using Cloudflare D1.
+
+This includes:
+
+- Subjects
+- Period configuration
+- Lessons
+- Lesson assignments
+- School-day configuration
+- Student rosters
+- Forbidden pairs
+- Seating charts
+
+Each person who deploys this template receives their own application and database resources through their Cloudflare account.
+
+## Privacy and Security
+
+This application was designed for classroom organizational information and intentionally minimizes student information stored in the database.
+
+Student roster entries contain only:
+
+- First name
+- Last initial
+- Class period
+
+Do not use this application to store grades, student identification numbers, medical information, IEP information, disciplinary records, contact information, or other sensitive student records.
+
+The built-in site password system is intended as a convenience barrier for a classroom dashboard. It should **not** be treated as strong authentication for sensitive or confidential information.
+
+Schools and districts may have additional student-data, privacy, security, or technology requirements. Teachers should follow their organization's policies before using the application with student information.
+
+## Technology
+
+The dashboard is built with:
+
+- React
+- TypeScript
+- Vite
+- Cloudflare Workers
+- Cloudflare D1
+
+## Local Development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the Vite development server:
+
+```bash
+npm run dev
+```
+
+Build the application:
+
+```bash
+npm run build
+```
+
+Apply D1 migrations:
+
+```bash
+npm run db:migrations:apply
+```
+
+Deploy:
+
+```bash
+npm run deploy
+```
+
+## Database Migrations
+
+Database migrations are stored in:
+
+```text
+migrations/
+```
+
+A fresh deployment applies the schema used by the application, including the flexible seating configuration.
+
+## License
+
+No license has currently been specified for this project.
       },
       // other options...
     },
