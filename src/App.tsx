@@ -29,6 +29,7 @@ import {
 
   fetchTeacherPin,
   updateTeacherPinInDatabase,
+  updateSitePasswordInDatabase,
 } from './utils/api'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -545,6 +546,34 @@ function App() {
           error instanceof Error
             ? error.message
             : 'The Teacher PIN could not be changed.',
+      }
+    }
+  }
+
+  async function changeSitePassword(
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    try {
+      await updateSitePasswordInDatabase(
+        currentPassword,
+        newPassword,
+      )
+
+      return {
+        success: true,
+        message:
+          'Site password changed. You will need to sign in again with the new password.',
+      }
+    } catch (error) {
+      console.error(error)
+
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'The site password could not be changed.',
       }
     }
   }
@@ -2321,6 +2350,11 @@ function App() {
           onChangeTeacherPin={
             changeTeacherPin
           }          
+
+          onChangeSitePassword={
+            changeSitePassword
+          }          
+
         />
       )}
 

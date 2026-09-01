@@ -2,7 +2,6 @@ import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env {
   classroom_dashboard: D1Database
-  SITE_PASSWORD: string
   ASSETS: {
     fetch(request: Request): Promise<Response>
   }
@@ -39,13 +38,127 @@ function jsonResponse(data: unknown, status = 200) {
   return Response.json(data, { status, headers: corsHeaders() })
 }
 
-function hasAuthCookie(request: Request): boolean {
-  const cookie = request.headers.get('Cookie') ?? ''
+function getAuthCookie(
+  request: Request,
+): string | null {
+  const cookie =
+    request.headers.get('Cookie') ?? ''
 
-  return cookie
-    .split(';')
-    .map(part => part.trim())
-    .some(part => part === `${AUTH_COOKIE}=yes`)
+  for (const part of cookie.split(';')) {
+    const trimmed = part.trim()
+
+    const prefix =
+      `${AUTH_COOKIE}=`
+
+    if (trimmed.startsWith(prefix)) {
+      return decodeURIComponent(
+        trimmed.slice(prefix.length),
+      )
+    }
+  }
+
+  return null
+}
+
+async function sha256(
+  value: string,
+): Promise<string> {
+  const encoded =
+    new TextEncoder().encode(value)
+
+  const hash =
+    await crypto.subtle.digest(
+      'SHA-256',
+      encoded,
+    )
+
+  return Array.from(
+    new Uint8Array(hash),
+  )
+    .map((byte) =>
+      byte
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')
+}
+
+function createRandomToken(): string {
+  const bytes =
+    new Uint8Array(32)
+
+  crypto.getRandomValues(bytes)
+
+  return Array.from(bytes)
+    .map((byte) =>
+      byte
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')
+}
+
+async function getSetting(
+  db: D1Database,
+  key: string,
+): Promise<string | null> {
+  const result = await db
+    .prepare(
+      `SELECT value
+       FROM app_settings
+       WHERE key = ?`,
+    )
+    .bind(key)
+    .first<{ value: string }>()
+
+  return result?.value ?? null
+}
+
+async function saveSetting(
+  db: D1Database,
+  key: string,
+  value: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO app_settings (
+        key,
+        value
+      )
+      VALUES (?, ?)
+      ON CONFLICT(key)
+      DO UPDATE SET
+        value = excluded.value`,
+    )
+    .bind(
+      key,
+      value,
+    )
+    .run()
+}
+
+async function hasValidAuthCookie(
+  request: Request,
+  db: D1Database,
+): Promise<boolean> {
+  const cookieToken =
+    getAuthCookie(request)
+
+  if (!cookieToken) {
+    return false
+  }
+
+  const storedToken =
+    await getSetting(
+      db,
+      'site_auth_token',
+    )
+
+  if (!storedToken) {
+    return false
+  }
+
+  return cookieToken === storedToken
 }
 
 function passwordPage(error = false): Response {
@@ -173,15 +286,77 @@ function passwordPage(error = false): Response {
   })
 }
 
-async function handleLogin(request: Request, env: Env): Promise<Response> {
-  const form = await request.formData()
-  const submittedPassword = form.get('password')
+async function handleLogin(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const form =
+    await request.formData()
+
+  const submittedPassword =
+    form.get('password')
 
   if (
-    typeof submittedPassword !== 'string' ||
-    submittedPassword !== env.SITE_PASSWORD
+    typeof submittedPassword !==
+    'string'
   ) {
     return passwordPage(true)
+  }
+
+  const db =
+    env.classroom_dashboard
+
+  const salt =
+    await getSetting(
+      db,
+      'site_password_salt',
+    )
+
+  const storedHash =
+    await getSetting(
+      db,
+      'site_password_hash',
+    )
+
+  if (!salt || !storedHash) {
+    return new Response(
+      'Site password settings are missing. Apply the database migrations and try again.',
+      {
+        status: 500,
+        headers: {
+          'Content-Type':
+            'text/plain; charset=UTF-8',
+        },
+      },
+    )
+  }
+
+  const submittedHash =
+    await sha256(
+      salt + submittedPassword,
+    )
+
+  if (
+    submittedHash !== storedHash
+  ) {
+    return passwordPage(true)
+  }
+
+  let authToken =
+    await getSetting(
+      db,
+      'site_auth_token',
+    )
+
+  if (!authToken) {
+    authToken =
+      createRandomToken()
+
+    await saveSetting(
+      db,
+      'site_auth_token',
+      authToken,
+    )
   }
 
   return new Response(null, {
@@ -189,7 +364,9 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     headers: {
       Location: '/',
       'Set-Cookie':
-        `${AUTH_COOKIE}=yes; Max-Age=${AUTH_MAX_AGE}; Path=/; HttpOnly; Secure; SameSite=Strict`,
+        `${AUTH_COOKIE}=${encodeURIComponent(
+          authToken,
+        )}; Max-Age=${AUTH_MAX_AGE}; Path=/; HttpOnly; Secure; SameSite=Strict`,
       'Cache-Control': 'no-store',
     },
   })
@@ -220,7 +397,13 @@ export default {
     // Production is password-protected. Local Wrangler development
     // is allowed through so the Vite app can call the local API
     // without relying on a Secure production cookie.
-    if (!isLocalDevelopment && !hasAuthCookie(request)) {
+    if (
+      !isLocalDevelopment &&
+      !await hasValidAuthCookie(
+        request,
+        env.classroom_dashboard,
+      )
+    ) {
       // API requests should not receive an HTML login page.
       if (url.pathname.startsWith('/api/')) {
         return jsonResponse({ error: 'Authentication required.' }, 401)
@@ -309,6 +492,127 @@ export default {
         )
         .bind(newPin)
         .run()
+
+      return jsonResponse({
+        ok: true,
+      })
+    }
+
+    // =========================================================
+    // SITE PASSWORD
+    // =========================================================
+
+    if (
+      request.method === 'PUT' &&
+      url.pathname ===
+        '/api/settings/site-password'
+    ) {
+      const body =
+        (await request.json()) as {
+          currentPassword?: string
+          newPassword?: string
+        }
+
+      const currentPassword =
+        body.currentPassword ?? ''
+
+      const newPassword =
+        body.newPassword ?? ''
+
+      if (newPassword.length < 6) {
+        return jsonResponse(
+          {
+            error:
+              'The new site password must contain at least 6 characters.',
+          },
+          400,
+        )
+      }
+
+      const currentSalt =
+        await getSetting(
+          db,
+          'site_password_salt',
+        )
+
+      const currentHash =
+        await getSetting(
+          db,
+          'site_password_hash',
+        )
+
+      if (
+        !currentSalt ||
+        !currentHash
+      ) {
+        return jsonResponse(
+          {
+            error:
+              'Site password settings are missing.',
+          },
+          500,
+        )
+      }
+
+      const submittedHash =
+        await sha256(
+          currentSalt +
+            currentPassword,
+        )
+
+      if (
+        submittedHash !== currentHash
+      ) {
+        return jsonResponse(
+          {
+            error:
+              'The current site password is incorrect.',
+          },
+          403,
+        )
+      }
+
+      const newSalt =
+        createRandomToken()
+
+      const newHash =
+        await sha256(
+          newSalt + newPassword,
+        )
+
+      // Rotating this token immediately invalidates
+      // every existing site-login cookie.
+      const newAuthToken =
+        createRandomToken()
+
+      await db.batch([
+        db
+          .prepare(
+            `INSERT INTO app_settings (key, value)
+            VALUES ('site_password_salt', ?)
+            ON CONFLICT(key)
+            DO UPDATE SET value = excluded.value`,
+          )
+          .bind(newSalt),
+
+        db
+          .prepare(
+            `INSERT INTO app_settings (key, value)
+            VALUES ('site_password_hash', ?)
+            ON CONFLICT(key)
+            DO UPDATE SET value = excluded.value`,
+          )
+          .bind(newHash),
+
+        db
+          .prepare(
+            `INSERT INTO app_settings (key, value)
+            VALUES ('site_auth_token', ?)
+            ON CONFLICT(key)
+            DO UPDATE SET value = excluded.value`,
+          )
+          .bind(newAuthToken),
+      ])
 
       return jsonResponse({
         ok: true,

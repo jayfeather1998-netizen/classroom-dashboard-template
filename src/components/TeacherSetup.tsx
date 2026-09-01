@@ -26,6 +26,13 @@ type TeacherSetupProps = {
     success: boolean
     message: string
   }>
+  onChangeSitePassword: (
+    currentPassword: string,
+    newPassword: string,
+  ) => Promise<{
+    success: boolean
+    message: string
+  }>
 }
 
 function TeacherSetup({
@@ -37,7 +44,8 @@ function TeacherSetup({
   onDeleteSubject,
   onUpdatePeriod,
   onChangeTeacherPin,
-}: TeacherSetupProps) {
+  onChangeSitePassword,
+  }: TeacherSetupProps) {
   const [currentPin, setCurrentPin] =
     useState('')
 
@@ -52,6 +60,31 @@ function TeacherSetup({
 
   const [changingPin, setChangingPin] =
     useState(false)
+
+  const [
+    currentSitePassword,
+    setCurrentSitePassword,
+  ] = useState('')
+
+  const [
+    newSitePassword,
+    setNewSitePassword,
+  ] = useState('')
+
+  const [
+    confirmSitePassword,
+    setConfirmSitePassword,
+  ] = useState('')
+
+  const [
+    sitePasswordMessage,
+    setSitePasswordMessage,
+  ] = useState('')
+
+  const [
+    changingSitePassword,
+    setChangingSitePassword,
+  ] = useState(false)
 
   async function handleChangePin() {
     setPinMessage('')
@@ -88,6 +121,49 @@ function TeacherSetup({
       }
     } finally {
       setChangingPin(false)
+    }
+  }
+
+  async function handleChangeSitePassword() {
+    setSitePasswordMessage('')
+
+    if (newSitePassword.length < 6) {
+      setSitePasswordMessage(
+        'The new site password must contain at least 6 characters.',
+      )
+      return
+    }
+
+    if (
+      newSitePassword !==
+      confirmSitePassword
+    ) {
+      setSitePasswordMessage(
+        'The new password entries do not match.',
+      )
+      return
+    }
+
+    setChangingSitePassword(true)
+
+    try {
+      const result =
+        await onChangeSitePassword(
+          currentSitePassword,
+          newSitePassword,
+        )
+
+      setSitePasswordMessage(
+        result.message,
+      )
+
+      if (result.success) {
+        setCurrentSitePassword('')
+        setNewSitePassword('')
+        setConfirmSitePassword('')
+      }
+    } finally {
+      setChangingSitePassword(false)
     }
   }
 
@@ -338,6 +414,80 @@ function TeacherSetup({
           {pinMessage && (
             <p className="teacher-pin-message">
               {pinMessage}
+            </p>
+          )}
+        </div>
+      </section>
+      <section className="teacher-section">
+        <h2>Site Password</h2>
+
+        <p className="section-note">
+          The default site password is classroom. This password
+          protects access to the entire dashboard. Change it after
+          setting up your copy.
+        </p>
+
+        <div className="teacher-pin-form">
+          <label>
+            Current Site Password
+
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={currentSitePassword}
+              onChange={(event) =>
+                setCurrentSitePassword(
+                  event.target.value,
+                )
+              }
+            />
+          </label>
+
+          <label>
+            New Site Password
+
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={newSitePassword}
+              onChange={(event) =>
+                setNewSitePassword(
+                  event.target.value,
+                )
+              }
+            />
+          </label>
+
+          <label>
+            Confirm New Site Password
+
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={confirmSitePassword}
+              onChange={(event) =>
+                setConfirmSitePassword(
+                  event.target.value,
+                )
+              }
+            />
+          </label>
+
+          <button
+            type="button"
+            disabled={changingSitePassword}
+            onClick={
+              handleChangeSitePassword
+            }
+          >
+            {changingSitePassword
+              ? 'Changing Password...'
+              : 'Change Site Password'}
+          </button>
+
+          {sitePasswordMessage && (
+            <p className="teacher-pin-message">
+              {sitePasswordMessage}
             </p>
           )}
         </div>

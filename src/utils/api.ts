@@ -517,3 +517,34 @@ export async function updateTeacherPinInDatabase(
     )
   }
 }
+
+export async function updateSitePasswordInDatabase(
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/settings/site-password`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        currentPassword,
+        newPassword,
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    const data =
+      (await response.json()) as {
+        error?: string
+      }
+
+    throw new Error(
+      data.error ??
+        'Failed to update site password.',
+    )
+  }
+}
