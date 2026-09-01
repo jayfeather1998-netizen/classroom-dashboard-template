@@ -26,6 +26,9 @@ import {
 
   fetchSeatingCharts,
   saveSeatingChart,
+
+  fetchTeacherPin,
+  updateTeacherPinInDatabase,
 } from './utils/api'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -62,9 +65,6 @@ import TeacherNav from './components/TeacherNav'
 import LessonCalendar from './components/LessonCalendar'
 import SeatingEditor from './components/SeatingEditor'
 
-
-const TEACHER_PIN = '7530'
-
 function App() {
   // =========================================================
   // MODE / NAVIGATION STATE
@@ -81,6 +81,9 @@ function App() {
   // =========================================================
   // PIN STATE
   // =========================================================
+
+  const [teacherPin, setTeacherPin] =
+    useState('1234')
 
   const [showPinPrompt, setShowPinPrompt] =
     useState(false)
@@ -476,8 +479,26 @@ function App() {
   // PIN FUNCTIONS
   // =========================================================
 
+  useEffect(() => {
+    async function loadTeacherPin() {
+      try {
+        const databasePin =
+          await fetchTeacherPin()
+
+        setTeacherPin(databasePin)
+      } catch (error) {
+        console.error(
+          'Could not load teacher PIN from D1:',
+          error,
+        )
+      }
+    }
+
+    loadTeacherPin()
+  }, [])
+
   function unlockTeacherMode() {
-    if (pinEntry !== TEACHER_PIN) {
+    if (pinEntry !== teacherPin) {
       setPinError('Incorrect PIN')
       return
     }
@@ -497,6 +518,35 @@ function App() {
     setPinEntry('')
     setPinError('')
     setPinAction('teacher')
+  }
+
+  async function changeTeacherPin(
+    currentPin: string,
+    newPin: string,
+  ) {
+    try {
+      await updateTeacherPinInDatabase(
+        currentPin,
+        newPin,
+      )
+
+      setTeacherPin(newPin)
+
+      return {
+        success: true,
+        message: 'Teacher PIN changed.',
+      }
+    } catch (error) {
+      console.error(error)
+
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'The Teacher PIN could not be changed.',
+      }
+    }
   }
 
   // =========================================================
@@ -2267,6 +2317,10 @@ function App() {
           onUpdatePeriod={
             updatePeriod
           }
+
+          onChangeTeacherPin={
+            changeTeacherPin
+          }          
         />
       )}
 

@@ -1,3 +1,7 @@
+import {
+  useState,
+} from 'react'
+
 import type {
   ClassPeriod,
   PeriodType,
@@ -15,6 +19,13 @@ type TeacherSetupProps = {
     periodId: string,
     changes: Partial<ClassPeriod>,
   ) => void
+  onChangeTeacherPin: (
+    currentPin: string,
+    newPin: string,
+  ) => Promise<{
+    success: boolean
+    message: string
+  }>
 }
 
 function TeacherSetup({
@@ -25,7 +36,61 @@ function TeacherSetup({
   onAddSubject,
   onDeleteSubject,
   onUpdatePeriod,
+  onChangeTeacherPin,
 }: TeacherSetupProps) {
+  const [currentPin, setCurrentPin] =
+    useState('')
+
+  const [newPin, setNewPin] =
+    useState('')
+
+  const [confirmPin, setConfirmPin] =
+    useState('')
+
+  const [pinMessage, setPinMessage] =
+    useState('')
+
+  const [changingPin, setChangingPin] =
+    useState(false)
+
+  async function handleChangePin() {
+    setPinMessage('')
+
+    if (!/^\d{4}$/.test(newPin)) {
+      setPinMessage(
+        'The new PIN must contain exactly 4 digits.',
+      )
+      return
+    }
+
+    if (newPin !== confirmPin) {
+      setPinMessage(
+        'The new PIN entries do not match.',
+      )
+      return
+    }
+
+    setChangingPin(true)
+
+    try {
+      const result =
+        await onChangeTeacherPin(
+          currentPin,
+          newPin,
+        )
+
+      setPinMessage(result.message)
+
+      if (result.success) {
+        setCurrentPin('')
+        setNewPin('')
+        setConfirmPin('')
+      }
+    } finally {
+      setChangingPin(false)
+    }
+  }
+
   return (
     <main className="teacher-content">
       <section className="teacher-section">
@@ -37,7 +102,9 @@ function TeacherSetup({
             placeholder="Subject name"
             value={newSubjectName}
             onChange={(event) =>
-              onNewSubjectNameChange(event.target.value)
+              onNewSubjectNameChange(
+                event.target.value,
+              )
             }
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
@@ -63,7 +130,9 @@ function TeacherSetup({
                 type="button"
                 aria-label={`Delete ${subject.name}`}
                 onClick={() =>
-                  onDeleteSubject(subject.id)
+                  onDeleteSubject(
+                    subject.id,
+                  )
                 }
               >
                 ×
@@ -87,14 +156,16 @@ function TeacherSetup({
               className="period-setting"
               key={period.id}
               style={{
-                borderLeftColor: period.accent,
+                borderLeftColor:
+                  period.accent,
               }}
             >
               <div className="period-setting-title">
                 <span
                   className="period-color-dot"
                   style={{
-                    backgroundColor: period.accent,
+                    backgroundColor:
+                      period.accent,
                   }}
                 />
 
@@ -102,8 +173,13 @@ function TeacherSetup({
                   Period {period.number}
                 </strong>
 
-                <span>{period.day} Day</span>
-                <span>{period.colorName}</span>
+                <span>
+                  {period.day} Day
+                </span>
+
+                <span>
+                  {period.colorName}
+                </span>
               </div>
 
               <label>
@@ -112,13 +188,23 @@ function TeacherSetup({
                 <select
                   value={period.type}
                   onChange={(event) =>
-                    onUpdatePeriod(period.id, {
-                      type: event.target.value as PeriodType,
-                    })
+                    onUpdatePeriod(
+                      period.id,
+                      {
+                        type:
+                          event.target
+                            .value as PeriodType,
+                      },
+                    )
                   }
                 >
-                  <option value="class">Class</option>
-                  <option value="prep">Prep</option>
+                  <option value="class">
+                    Class
+                  </option>
+
+                  <option value="prep">
+                    Prep
+                  </option>
                 </select>
               </label>
 
@@ -126,31 +212,134 @@ function TeacherSetup({
                 Subject
 
                 <select
-                  value={period.subjectId ?? ''}
-                  disabled={period.type === 'prep'}
+                  value={
+                    period.subjectId ??
+                    ''
+                  }
+                  disabled={
+                    period.type ===
+                    'prep'
+                  }
                   onChange={(event) =>
-                    onUpdatePeriod(period.id, {
-                      subjectId:
-                        event.target.value || null,
-                    })
+                    onUpdatePeriod(
+                      period.id,
+                      {
+                        subjectId:
+                          event.target
+                            .value ||
+                          null,
+                      },
+                    )
                   }
                 >
                   <option value="">
                     No subject
                   </option>
 
-                  {subjects.map((subject) => (
-                    <option
-                      key={subject.id}
-                      value={subject.id}
-                    >
-                      {subject.name}
-                    </option>
-                  ))}
+                  {subjects.map(
+                    (subject) => (
+                      <option
+                        key={
+                          subject.id
+                        }
+                        value={
+                          subject.id
+                        }
+                      >
+                        {
+                          subject.name
+                        }
+                      </option>
+                    ),
+                  )}
                 </select>
               </label>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="teacher-section">
+        <h2>Teacher PIN</h2>
+
+        <p className="section-note">
+          The default Teacher PIN is 1234. Change it here
+          after setting up your dashboard.
+        </p>
+
+        <div className="teacher-pin-form">
+          <label>
+            Current PIN
+
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={currentPin}
+              onChange={(event) =>
+                setCurrentPin(
+                  event.target.value.replace(
+                    /\D/g,
+                    '',
+                  ),
+                )
+              }
+            />
+          </label>
+
+          <label>
+            New PIN
+
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={newPin}
+              onChange={(event) =>
+                setNewPin(
+                  event.target.value.replace(
+                    /\D/g,
+                    '',
+                  ),
+                )
+              }
+            />
+          </label>
+
+          <label>
+            Confirm New PIN
+
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={confirmPin}
+              onChange={(event) =>
+                setConfirmPin(
+                  event.target.value.replace(
+                    /\D/g,
+                    '',
+                  ),
+                )
+              }
+            />
+          </label>
+
+          <button
+            type="button"
+            disabled={changingPin}
+            onClick={handleChangePin}
+          >
+            {changingPin
+              ? 'Changing PIN...'
+              : 'Change Teacher PIN'}
+          </button>
+
+          {pinMessage && (
+            <p className="teacher-pin-message">
+              {pinMessage}
+            </p>
+          )}
         </div>
       </section>
     </main>

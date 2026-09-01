@@ -231,6 +231,90 @@ export default {
 
     const db = env.classroom_dashboard
 
+    // =========================================================
+    // APP SETTINGS
+    // =========================================================
+
+    if (
+      request.method === 'GET' &&
+      url.pathname === '/api/settings/teacher-pin'
+    ) {
+      const result = await db
+        .prepare(
+          `SELECT value
+          FROM app_settings
+          WHERE key = 'teacher_pin'`,
+        )
+        .first<{ value: string }>()
+
+      return jsonResponse({
+        teacherPin:
+          result?.value ?? '1234',
+      })
+    }
+
+    if (
+      request.method === 'PUT' &&
+      url.pathname === '/api/settings/teacher-pin'
+    ) {
+      const body =
+        (await request.json()) as {
+          currentPin?: string
+          newPin?: string
+        }
+
+      const currentPin =
+        body.currentPin ?? ''
+
+      const newPin =
+        body.newPin ?? ''
+
+      if (!/^\d{4}$/.test(newPin)) {
+        return jsonResponse(
+          {
+            error:
+              'The new PIN must contain exactly 4 digits.',
+          },
+          400,
+        )
+      }
+
+      const existing = await db
+        .prepare(
+          `SELECT value
+          FROM app_settings
+          WHERE key = 'teacher_pin'`,
+        )
+        .first<{ value: string }>()
+
+      const storedPin =
+        existing?.value ?? '1234'
+
+      if (currentPin !== storedPin) {
+        return jsonResponse(
+          {
+            error:
+              'The current PIN is incorrect.',
+          },
+          403,
+        )
+      }
+
+      await db
+        .prepare(
+          `INSERT INTO app_settings (key, value)
+          VALUES ('teacher_pin', ?)
+          ON CONFLICT(key)
+          DO UPDATE SET value = excluded.value`,
+        )
+        .bind(newPin)
+        .run()
+
+      return jsonResponse({
+        ok: true,
+      })
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/health') {
       const result = await db
         .prepare('SELECT COUNT(*) AS count FROM subjects')

@@ -1843,3 +1843,51 @@ body {
   padding: 3px 6px;
   font-size: clamp(0.72rem, 0.9vw, 1.05rem);
 }
+
+/* ---------------------------
+   TEACHER PIN SETTINGS
+---------------------------- */
+
+.teacher-pin-form {
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.teacher-pin-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.teacher-pin-form input {
+  padding: 10px 12px;
+}
+
+.teacher-pin-form button {
+  align-self: flex-start;
+  padding: 10px 16px;
+  border: 1px solid #59616e;
+  border-radius: 7px;
+  background: #343b46;
+  color: white;
+  font-weight: 700;
+}
+
+.teacher-pin-form button:hover:not(:disabled) {
+  background: #414957;
+}
+
+.teacher-pin-form button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.teacher-pin-message {
+  margin: 0;
+  color: #cbd1da;
+  font-weight: 700;
+}

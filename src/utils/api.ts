@@ -464,3 +464,56 @@ export async function saveSeatingChart(
 
   return response.json()
 }
+
+// ============================================================
+// APP SETTINGS
+// ============================================================
+
+export async function fetchTeacherPin(): Promise<string> {
+  const response = await fetch(
+    `${API_BASE}/api/settings/teacher-pin`,
+  )
+
+  await requireOk(
+    response,
+    'Failed to load teacher PIN.',
+  )
+
+  const data =
+    (await response.json()) as {
+      teacherPin: string
+    }
+
+  return data.teacherPin
+}
+
+export async function updateTeacherPinInDatabase(
+  currentPin: string,
+  newPin: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/settings/teacher-pin`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        currentPin,
+        newPin,
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    const data =
+      (await response.json()) as {
+        error?: string
+      }
+
+    throw new Error(
+      data.error ??
+        'Failed to update teacher PIN.',
+    )
+  }
+}
