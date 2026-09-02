@@ -1,5 +1,16 @@
 export type DayType = 'A' | 'B'
 
+export type ScheduleMode =
+  | 'block'
+  | 'standard'
+
+export type ScheduleSettings = {
+  mode: ScheduleMode
+  standardPeriodCount: number
+  aDayPeriodCount: number
+  bDayPeriodCount: number
+}
+
 export type PeriodType = 'class' | 'prep'
 
 export type Subject = {

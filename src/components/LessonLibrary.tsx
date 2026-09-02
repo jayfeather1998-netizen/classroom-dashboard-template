@@ -5,6 +5,7 @@ import LessonImportModal from './LessonImportModal'
 type LessonLibraryProps = {
   subjects: Subject[]
   lessons: Lesson[]
+  saveStatus: 'saved' | 'unsaved' | 'saving'
   selectedLessonId: string | null
   lessonSubjectFilter: string
 
@@ -34,6 +35,7 @@ type SortMode = 'code' | 'name' | 'unit'
 function LessonLibrary({
   subjects,
   lessons,
+  saveStatus,
   selectedLessonId,
   lessonSubjectFilter,
 
@@ -594,9 +596,12 @@ function LessonLibrary({
                     : ''}
                   {selectedLesson.name}
                 </h2>
-
-                <p>
-                  Changes are saved automatically.
+                <p className="lesson-save-status">
+                  {saveStatus === 'saving'
+                    ? 'Saving...'
+                    : saveStatus === 'unsaved'
+                      ? 'Unsaved changes — autosaves every 30 seconds'
+                      : 'Saved'}
                 </p>
               </div>
 

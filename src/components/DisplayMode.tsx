@@ -188,7 +188,7 @@ function DisplayMode({
           </div>
         </section>
 
-        <section className="display-card seating-card">
+        <section className="dashboard-card seating-card">
           <h2
             style={{
               color:

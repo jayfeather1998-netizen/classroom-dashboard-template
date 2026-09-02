@@ -12,6 +12,12 @@ type Period = { id: string; number: number; day: 'A' | 'B'; type: 'class' | 'pre
 type Lesson = { id: string; subjectId: string; unit: string; code: string; name: string; learningTarget: string; instructions: string; homework: string; warmUp: string }
 type LessonAssignment = { id: string; date: string; periodId: string; lessonId: string }
 type SchoolDay = { date: string; dayType: 'A' | 'B' | 'none' }
+type ScheduleSettings = {
+  mode: 'block' | 'standard'
+  standardPeriodCount: number
+  aDayPeriodCount: number
+  bDayPeriodCount: number
+}
 type Student = { id: string; periodId: string; firstName: string; lastInitial: string }
 type ForbiddenPair = { id: string; periodId: string; studentId1: string; studentId2: string }
 type SeatingChart = {
@@ -498,6 +504,151 @@ export default {
       })
     }
 
+    if (
+      request.method === 'GET' &&
+      url.pathname === '/api/settings/schedule'
+    ) {
+      const [
+        mode,
+        standardPeriodCount,
+        aDayPeriodCount,
+        bDayPeriodCount,
+      ] = await Promise.all([
+        getSetting(db, 'schedule_mode'),
+        getSetting(db, 'standard_period_count'),
+        getSetting(db, 'a_day_period_count'),
+        getSetting(db, 'b_day_period_count'),
+      ])
+
+      const settings: ScheduleSettings = {
+        mode:
+          mode === 'standard'
+            ? 'standard'
+            : 'block',
+
+        standardPeriodCount:
+          Math.max(
+            1,
+            Number(standardPeriodCount) || 8,
+          ),
+
+        aDayPeriodCount:
+          Math.max(
+            1,
+            Number(aDayPeriodCount) || 4,
+          ),
+
+        bDayPeriodCount:
+          Math.max(
+            1,
+            Number(bDayPeriodCount) || 4,
+          ),
+      }
+
+      return jsonResponse(settings)
+    }
+
+    if (
+      request.method === 'PUT' &&
+      url.pathname === '/api/settings/schedule'
+    ) {
+      const body =
+        (await request.json()) as Partial<ScheduleSettings>
+
+      const mode =
+        body.mode === 'standard'
+          ? 'standard'
+          : body.mode === 'block'
+            ? 'block'
+            : null
+
+      if (!mode) {
+        return jsonResponse(
+          {
+            error:
+              'Schedule mode must be block or standard.',
+          },
+          400,
+        )
+      }
+
+      const standardPeriodCount =
+        Math.floor(
+          Number(body.standardPeriodCount),
+        )
+
+      const aDayPeriodCount =
+        Math.floor(
+          Number(body.aDayPeriodCount),
+        )
+
+      const bDayPeriodCount =
+        Math.floor(
+          Number(body.bDayPeriodCount),
+        )
+
+      if (
+        standardPeriodCount < 1 ||
+        aDayPeriodCount < 1 ||
+        bDayPeriodCount < 1
+      ) {
+        return jsonResponse(
+          {
+            error:
+              'Each period count must be at least 1.',
+          },
+          400,
+        )
+      }
+
+      await db.batch([
+        db
+          .prepare(
+            `INSERT INTO app_settings (key, value)
+            VALUES ('schedule_mode', ?)
+            ON CONFLICT(key)
+            DO UPDATE SET value = excluded.value`,
+          )
+          .bind(mode),
+
+        db
+          .prepare(
+            `INSERT INTO app_settings (key, value)
+            VALUES ('standard_period_count', ?)
+            ON CONFLICT(key)
+            DO UPDATE SET value = excluded.value`,
+          )
+          .bind(String(standardPeriodCount)),
+
+        db
+          .prepare(
+            `INSERT INTO app_settings (key, value)
+            VALUES ('a_day_period_count', ?)
+            ON CONFLICT(key)
+            DO UPDATE SET value = excluded.value`,
+          )
+          .bind(String(aDayPeriodCount)),
+
+        db
+          .prepare(
+            `INSERT INTO app_settings (key, value)
+            VALUES ('b_day_period_count', ?)
+            ON CONFLICT(key)
+            DO UPDATE SET value = excluded.value`,
+          )
+          .bind(String(bDayPeriodCount)),
+      ])
+
+      const settings: ScheduleSettings = {
+        mode,
+        standardPeriodCount,
+        aDayPeriodCount,
+        bDayPeriodCount,
+      }
+
+      return jsonResponse(settings)
+    }
+
     // =========================================================
     // SITE PASSWORD
     // =========================================================
@@ -665,10 +816,41 @@ export default {
         url.pathname.replace('/api/subjects/', ''),
       )
 
-      await db
-        .prepare('DELETE FROM subjects WHERE id = ?')
+      const lessonCount = await db
+        .prepare(
+          `SELECT COUNT(*) AS count
+          FROM lessons
+          WHERE subject_id = ?`,
+        )
         .bind(id)
-        .run()
+        .first<{ count: number }>()
+
+      if ((lessonCount?.count ?? 0) > 0) {
+        return jsonResponse(
+          {
+            error:
+              'This subject cannot be deleted because lessons are still assigned to it.',
+          },
+          409,
+        )
+      }
+
+      await db.batch([
+        db
+          .prepare(
+            `UPDATE periods
+            SET subject_id = NULL
+            WHERE subject_id = ?`,
+          )
+          .bind(id),
+
+        db
+          .prepare(
+            `DELETE FROM subjects
+            WHERE id = ?`,
+          )
+          .bind(id),
+      ])
 
       return jsonResponse({ ok: true })
     }

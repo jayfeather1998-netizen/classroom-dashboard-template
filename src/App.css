@@ -1891,3 +1891,7 @@ body {
   color: #cbd1da;
   font-weight: 700;
 }
+
+.seating-card > h2 {
+  display: none;
+}

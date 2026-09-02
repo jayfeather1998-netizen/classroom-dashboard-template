@@ -4,6 +4,7 @@ import type {
   DayType,
   Lesson,
   LessonAssignment,
+  ScheduleSettings,
   SchoolDay,
   Subject,
 } from '../types/classroom'
@@ -14,6 +15,7 @@ type LessonCalendarProps = {
   lessons: Lesson[]
   lessonAssignments: LessonAssignment[]
   schoolDays: SchoolDay[]
+  scheduleSettings: ScheduleSettings
 
   onSetSchoolDay: (
     date: string,
@@ -47,6 +49,7 @@ function LessonCalendar({
   lessons,
   lessonAssignments,
   schoolDays,
+  scheduleSettings,
   onSetSchoolDay,
   onAssignLesson,
   onShiftLessons,
@@ -97,12 +100,35 @@ function LessonCalendar({
     setViewMonth(next.getMonth())
   }
 
+  const sortedPeriods = [...periods].sort(
+    (periodA, periodB) =>
+      periodA.number - periodB.number,
+  )
+
+  const configuredPeriods =
+    scheduleSettings.mode === 'standard'
+      ? sortedPeriods.slice(
+          0,
+          scheduleSettings.standardPeriodCount,
+        )
+      : selectedDayType === 'A'
+        ? sortedPeriods.slice(
+            0,
+            scheduleSettings.aDayPeriodCount,
+          )
+        : selectedDayType === 'B'
+          ? sortedPeriods.slice(
+              scheduleSettings.aDayPeriodCount,
+              scheduleSettings.aDayPeriodCount +
+                scheduleSettings.bDayPeriodCount,
+            )
+          : []
+
   const visiblePeriods =
     selectedDayType === 'none'
       ? []
-      : periods.filter(
+      : configuredPeriods.filter(
           (period) =>
-            period.day === selectedDayType &&
             period.type === 'class',
         )
 
@@ -162,18 +188,31 @@ function LessonCalendar({
               >
                 <strong>{date.getDate()}</strong>
 
-                {schoolDay?.dayType === 'A' && (
-                  <span className="day-badge">
-                    A
-                  </span>
-                )}
+                {scheduleSettings.mode ===
+                  'block' &&
+                  schoolDay?.dayType === 'A' && (
+                    <span className="day-badge">
+                      A
+                    </span>
+                  )}
 
-                {schoolDay?.dayType === 'B' && (
-                  <span className="day-badge">
-                    B
-                  </span>
-                )}
+                {scheduleSettings.mode ===
+                  'block' &&
+                  schoolDay?.dayType === 'B' && (
+                    <span className="day-badge">
+                      B
+                    </span>
+                  )}
 
+                  {scheduleSettings.mode ===
+                    'standard' &&
+                    schoolDay &&
+                    schoolDay.dayType !== 'none' && (
+                      <span
+                        className="day-badge"
+                        aria-label="School Day"
+                      />
+                    )}
                 {schoolDay?.dayType === 'none' && (
                   <span className="no-school-label">
                     —
@@ -200,30 +239,70 @@ function LessonCalendar({
         <div className="day-type-controls">
           <span>Schedule:</span>
 
-          <button
-            className={selectedDayType === 'A' ? 'active' : ''}
-            onClick={() =>
-              onSetSchoolDay(selectedDate, 'A')
-            }
-          >
-            A Day
-          </button>
+          {scheduleSettings.mode ===
+          'standard' ? (
+            <button
+              className={
+                selectedDayType !== 'none'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() =>
+                onSetSchoolDay(
+                  selectedDate,
+                  'A',
+                )
+              }
+            >
+              School Day
+            </button>
+          ) : (
+            <>
+              <button
+                className={
+                  selectedDayType === 'A'
+                    ? 'active'
+                    : ''
+                }
+                onClick={() =>
+                  onSetSchoolDay(
+                    selectedDate,
+                    'A',
+                  )
+                }
+              >
+                A Day
+              </button>
 
-          <button
-            className={selectedDayType === 'B' ? 'active' : ''}
-            onClick={() =>
-              onSetSchoolDay(selectedDate, 'B')
-            }
-          >
-            B Day
-          </button>
+              <button
+                className={
+                  selectedDayType === 'B'
+                    ? 'active'
+                    : ''
+                }
+                onClick={() =>
+                  onSetSchoolDay(
+                    selectedDate,
+                    'B',
+                  )
+                }
+              >
+                B Day
+              </button>
+            </>
+          )}
 
           <button
             className={
-              selectedDayType === 'none' ? 'active' : ''
+              selectedDayType === 'none'
+                ? 'active'
+                : ''
             }
             onClick={() =>
-              onSetSchoolDay(selectedDate, 'none')
+              onSetSchoolDay(
+                selectedDate,
+                'none',
+              )
             }
           >
             No School
@@ -232,7 +311,10 @@ function LessonCalendar({
 
         {selectedDayType === 'none' ? (
         <div className="calendar-empty-state">
-            Select A Day or B Day to assign lessons.
+          {scheduleSettings.mode ===
+          'standard'
+            ? 'Select School Day to assign lessons.'
+            : 'Select A Day or B Day to assign lessons.'}
         </div>
         ) : (
         <>
@@ -241,8 +323,11 @@ function LessonCalendar({
                 <strong>Schedule adjustments</strong>
 
                 <span>
-                Move lessons from this date forward by one{' '}
-                {selectedDayType} Day.
+                  Move lessons from this date forward by one{' '}
+                  {scheduleSettings.mode === 'standard'
+                    ? 'School Day'
+                    : `${selectedDayType} Day`}
+                  .
                 </span>
             </div>
 
@@ -250,7 +335,9 @@ function LessonCalendar({
                 type="button"
                 onClick={() => {
                 const confirmed = window.confirm(
-                    `Shift ALL ${selectedDayType} Day classes from this date forward by one ${selectedDayType} Day?\n\nThe other day type will not be changed.`,
+                  scheduleSettings.mode === 'standard'
+                    ? 'Shift ALL classes from this date forward by one School Day?'
+                    : `Shift ALL ${selectedDayType} Day classes from this date forward by one ${selectedDayType} Day?\n\nThe other day type will not be changed.`,
                 )
 
                 if (!confirmed) return
@@ -306,9 +393,11 @@ function LessonCalendar({
                         className="period-shift-button"
                         onClick={() => {
                         const confirmed = window.confirm(
-                            `Shift Period ${period.number} from this date forward by one ${selectedDayType} Day?\n\nOther periods and all ${
-                            selectedDayType === 'A' ? 'B' : 'A'
-                            } Days will remain unchanged.`,
+                          scheduleSettings.mode === 'standard'
+                            ? `Shift Period ${period.number} from this date forward by one School Day?\n\nOther periods will remain unchanged.`
+                            : `Shift Period ${period.number} from this date forward by one ${selectedDayType} Day?\n\nOther periods and all ${
+                                selectedDayType === 'A' ? 'B' : 'A'
+                              } Days will remain unchanged.`,
                         )
 
                         if (!confirmed) return

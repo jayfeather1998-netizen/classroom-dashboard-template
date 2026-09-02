@@ -1,10 +1,12 @@
 import {
+  useEffect,
   useState,
 } from 'react'
 
 import type {
   ClassPeriod,
   PeriodType,
+  ScheduleSettings,
   Subject,
 } from '../types/classroom'
 
@@ -33,6 +35,16 @@ type TeacherSetupProps = {
     success: boolean
     message: string
   }>
+
+  scheduleSettings: ScheduleSettings
+
+  onChangeScheduleSettings: (
+    settings: ScheduleSettings,
+  ) => Promise<{
+    success: boolean
+    message: string
+  }>
+
 }
 
 function TeacherSetup({
@@ -45,6 +57,8 @@ function TeacherSetup({
   onUpdatePeriod,
   onChangeTeacherPin,
   onChangeSitePassword,
+  scheduleSettings,
+  onChangeScheduleSettings,
   }: TeacherSetupProps) {
   const [currentPin, setCurrentPin] =
     useState('')
@@ -84,6 +98,29 @@ function TeacherSetup({
   const [
     changingSitePassword,
     setChangingSitePassword,
+  ] = useState(false)
+
+  const [
+    scheduleDraft,
+    setScheduleDraft,
+  ] = useState<ScheduleSettings>(
+    scheduleSettings,
+  )
+
+  useEffect(() => {
+    setScheduleDraft(
+      scheduleSettings,
+    )
+  }, [scheduleSettings])
+
+  const [
+    scheduleMessage,
+    setScheduleMessage,
+  ] = useState('')
+
+  const [
+    savingSchedule,
+    setSavingSchedule,
   ] = useState(false)
 
   async function handleChangePin() {
@@ -167,6 +204,50 @@ function TeacherSetup({
     }
   }
 
+  async function handleSaveSchedule() {
+    setScheduleMessage('')
+    setSavingSchedule(true)
+
+    try {
+      const result =
+        await onChangeScheduleSettings(
+          scheduleDraft,
+        )
+
+      setScheduleMessage(
+        result.message,
+      )
+    } finally {
+      setSavingSchedule(false)
+    }
+  }
+
+  const sortedPeriods = [...periods].sort(
+    (periodA, periodB) =>
+      periodA.number - periodB.number,
+  )
+
+  const displayedPeriods =
+    scheduleSettings.mode === 'standard'
+      ? sortedPeriods.slice(
+          0,
+          scheduleSettings.standardPeriodCount,
+        )
+      : sortedPeriods.slice(
+          0,
+          scheduleSettings.aDayPeriodCount +
+            scheduleSettings.bDayPeriodCount,
+        )
+
+  function getDisplayedBlockDay(
+    periodIndex: number,
+  ) {
+    return periodIndex <
+      scheduleSettings.aDayPeriodCount
+      ? 'A'
+      : 'B'
+  }
+
   return (
     <main className="teacher-content">
       <section className="teacher-section">
@@ -219,15 +300,159 @@ function TeacherSetup({
       </section>
 
       <section className="teacher-section">
+        <h2>Schedule</h2>
+
+        <p className="section-note">
+          Choose how class periods are organized
+          during the school day.
+        </p>
+
+        <div className="teacher-pin-form">
+          <label>
+            Schedule Type
+
+            <select
+              value={scheduleDraft.mode}
+              onChange={(event) => {
+                setScheduleDraft({
+                  ...scheduleDraft,
+                  mode:
+                    event.target.value ===
+                    'standard'
+                      ? 'standard'
+                      : 'block',
+                })
+
+                setScheduleMessage('')
+              }}
+            >
+              <option value="block">
+                Block Schedule
+              </option>
+
+              <option value="standard">
+                Standard Schedule
+              </option>
+            </select>
+          </label>
+
+          {scheduleDraft.mode ===
+          'standard' ? (
+            <label>
+              Periods Per Day
+
+              <input
+                type="number"
+                min="1"
+                max="13"
+                value={
+                  scheduleDraft.standardPeriodCount
+                }
+                onChange={(event) => {
+                  setScheduleDraft({
+                    ...scheduleDraft,
+                    standardPeriodCount:
+                      Math.max(
+                        1,
+                        Number(
+                          event.target.value,
+                        ) || 1,
+                      ),
+                  })
+
+                  setScheduleMessage('')
+                }}
+              />
+            </label>
+          ) : (
+            <>
+              <label>
+                A Day Periods
+
+                <input
+                  type="number"
+                  min="1"
+                  max="6"
+                  value={
+                    scheduleDraft.aDayPeriodCount
+                  }
+                  onChange={(event) => {
+                    setScheduleDraft({
+                      ...scheduleDraft,
+                      aDayPeriodCount:
+                        Math.max(
+                          1,
+                          Number(
+                            event.target.value,
+                          ) || 1,
+                        ),
+                    })
+
+                    setScheduleMessage('')
+                  }}
+                />
+              </label>
+
+              <label>
+                B Day Periods
+
+                <input
+                  type="number"
+                  min="1"
+                  max="6"
+                  value={
+                    scheduleDraft.bDayPeriodCount
+                  }
+                  onChange={(event) => {
+                    setScheduleDraft({
+                      ...scheduleDraft,
+                      bDayPeriodCount:
+                        Math.max(
+                          1,
+                          Number(
+                            event.target.value,
+                          ) || 1,
+                        ),
+                    })
+
+                    setScheduleMessage('')
+                  }}
+                />
+              </label>
+            </>
+          )}
+
+          <button
+            type="button"
+            disabled={savingSchedule}
+            onClick={handleSaveSchedule}
+          >
+            {savingSchedule
+              ? 'Saving...'
+              : 'Save Schedule Settings'}
+          </button>
+
+          {scheduleMessage && (
+            <p className="teacher-pin-message">
+              {scheduleMessage}
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section className="teacher-section">
         <h2>Class Periods</h2>
 
         <p className="section-note">
-          Periods 0 and 5 are advisory and are intentionally
-          not included.
+          {scheduleSettings.mode ===
+          'standard'
+            ? `Periods 0–${scheduleSettings.standardPeriodCount} are available. Mark any unused periods as Prep.`
+            : 'Configure the class and prep periods used on A Days and B Days.'}
         </p>
 
         <div className="period-settings">
-          {periods.map((period) => (
+          {displayedPeriods.map(
+            (period, periodIndex) => (
             <div
               className="period-setting"
               key={period.id}
@@ -249,9 +474,15 @@ function TeacherSetup({
                   Period {period.number}
                 </strong>
 
-                <span>
-                  {period.day} Day
-                </span>
+                {scheduleSettings.mode ===
+                  'block' && (
+                  <span>
+                    {getDisplayedBlockDay(
+                      periodIndex,
+                    )}{' '}
+                    Day
+                  </span>
+                )}
 
                 <span>
                   {period.colorName}

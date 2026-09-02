@@ -30,9 +30,18 @@ import {
   fetchTeacherPin,
   updateTeacherPinInDatabase,
   updateSitePasswordInDatabase,
+
+  fetchScheduleSettings,
+  updateScheduleSettingsInDatabase,
 } from './utils/api'
 
-import { useEffect, useMemo, useState } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+
 import './App.css'
 
 import type {
@@ -45,6 +54,7 @@ import type {
   SeatingChart,
   SeatingLayoutMode,
   Student,
+  ScheduleSettings,
 } from './types/classroom'
 
 import {
@@ -77,7 +87,7 @@ function App() {
   const [teacherPage, setTeacherPage] =
     useState<
       'setup' | 'lessons' | 'calendar' | 'seating'
-    >('setup')
+    >('calendar')
 
   // =========================================================
   // PIN STATE
@@ -85,6 +95,16 @@ function App() {
 
   const [teacherPin, setTeacherPin] =
     useState('1234')
+
+  const [
+    scheduleSettings,
+    setScheduleSettings,
+  ] = useState<ScheduleSettings>({
+    mode: 'block',
+    standardPeriodCount: 10,
+    aDayPeriodCount: 5,
+    bDayPeriodCount: 5,
+  })
 
   const [showPinPrompt, setShowPinPrompt] =
     useState(false)
@@ -129,6 +149,12 @@ function App() {
 
   const [selectedLessonId, setSelectedLessonId] =
     useState<string | null>(null)
+
+  const pendingLessonSaves =
+    useRef<Map<string, Lesson>>(new Map())
+
+  const [lessonSaveStatus, setLessonSaveStatus] =
+    useState<'saved' | 'unsaved' | 'saving'>('saved')
 
   const [
     lessonSubjectFilter,
@@ -200,19 +226,150 @@ function App() {
   // DERIVED PERIOD DATA
   // =========================================================
 
-  const availablePeriods = useMemo(
-    () =>
-      periods.filter(
-        (period) => period.type === 'class',
+  const seatingPeriods = useMemo(() => {
+    const sortedPeriods = [...periods].sort(
+      (periodA, periodB) =>
+        periodA.number - periodB.number,
+    )
+
+    const configuredPeriods =
+      scheduleSettings.mode === 'standard'
+        ? sortedPeriods.slice(
+            0,
+            scheduleSettings.standardPeriodCount,
+          )
+        : sortedPeriods.slice(
+            0,
+            scheduleSettings.aDayPeriodCount +
+              scheduleSettings.bDayPeriodCount,
+          )
+
+    return configuredPeriods.filter(
+      (period) =>
+        period.type === 'class',
+    )
+  }, [
+    periods,
+    scheduleSettings,
+  ])
+
+  const availablePeriods = useMemo(() => {
+    const sortedPeriods = [...periods].sort(
+      (periodA, periodB) =>
+        periodA.number - periodB.number,
+    )
+
+    if (scheduleSettings.mode === 'standard') {
+      const today = new Date()
+
+      const todayKey = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(
+          2,
+          '0',
+        ),
+        String(today.getDate()).padStart(
+          2,
+          '0',
+        ),
+      ].join('-')
+
+      const todaySchoolDay =
+        schoolDays.find(
+          (day) =>
+            day.date === todayKey,
+        )
+
+      if (
+        !todaySchoolDay ||
+        todaySchoolDay.dayType === 'none'
+      ) {
+        return []
+      }
+
+      return sortedPeriods
+        .slice(
+          0,
+          scheduleSettings.standardPeriodCount,
+        )
+        .filter(
+          (period) =>
+            period.type === 'class',
+        )
+    }
+
+    const today = new Date()
+
+    const todayKey = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(
+        2,
+        '0',
       ),
-    [periods],
-  )
+      String(today.getDate()).padStart(
+        2,
+        '0',
+      ),
+    ].join('-')
+
+    const todaySchoolDay =
+      schoolDays.find(
+        (day) =>
+          day.date === todayKey,
+      )
+
+    if (
+      !todaySchoolDay ||
+      todaySchoolDay.dayType === 'none'
+    ) {
+      return []
+    }
+
+    const configuredPeriods =
+      todaySchoolDay.dayType === 'A'
+        ? sortedPeriods.slice(
+            0,
+            scheduleSettings.aDayPeriodCount,
+          )
+        : sortedPeriods.slice(
+            scheduleSettings.aDayPeriodCount,
+            scheduleSettings.aDayPeriodCount +
+              scheduleSettings.bDayPeriodCount,
+          )
+
+    return configuredPeriods.filter(
+      (period) =>
+        period.type === 'class',
+    )
+  }, [
+    periods,
+    scheduleSettings,
+    schoolDays,
+  ])
   const [
     selectedSeatingPeriodId,
     setSelectedSeatingPeriodId,
   ] = useState(
-    () => availablePeriods[0]?.id ?? '',
+    () => seatingPeriods[0]?.id ?? '',
   )
+
+  useEffect(() => {
+    const stillExists =
+      seatingPeriods.some(
+        (period) =>
+          period.id ===
+          selectedSeatingPeriodId,
+      )
+
+    if (!stillExists) {
+      setSelectedSeatingPeriodId(
+        seatingPeriods[0]?.id ?? '',
+      )
+    }
+  }, [
+    seatingPeriods,
+    selectedSeatingPeriodId,
+  ])
 
   const [selectedPeriodId, setSelectedPeriodId] =
     useState(
@@ -259,16 +416,23 @@ function App() {
       (day) => day.date === todayKey,
     )
 
-  const selectedLessonAssignment =
-    todaySchoolDay?.dayType !== 'none' &&
-    selectedPeriod?.day === todaySchoolDay?.dayType
-      ? lessonAssignments.find(
-          (assignment) =>
-            assignment.date === todayKey &&
-            assignment.periodId ===
-              selectedPeriodId,
-        )
-      : undefined
+const selectedPeriodIsAvailableToday =
+  availablePeriods.some(
+    (period) =>
+      period.id === selectedPeriod?.id,
+  )
+
+const selectedLessonAssignment =
+  todaySchoolDay &&
+  todaySchoolDay.dayType !== 'none' &&
+  selectedPeriodIsAvailableToday
+    ? lessonAssignments.find(
+        (assignment) =>
+          assignment.date === todayKey &&
+          assignment.periodId ===
+            selectedPeriodId,
+      )
+    : undefined
 
   const selectedDisplayLesson =
     lessons.find(
@@ -495,7 +659,24 @@ function App() {
       }
     }
 
+    async function loadScheduleSettings() {
+      try {
+        const databaseSettings =
+          await fetchScheduleSettings()
+
+        setScheduleSettings(
+          databaseSettings,
+        )
+      } catch (error) {
+        console.error(
+          'Could not load schedule settings from D1:',
+          error,
+        )
+      }
+    }
+
     loadTeacherPin()
+    loadScheduleSettings()
   }, [])
 
   function unlockTeacherMode() {
@@ -546,6 +727,37 @@ function App() {
           error instanceof Error
             ? error.message
             : 'The Teacher PIN could not be changed.',
+      }
+    }
+  }
+
+  async function changeScheduleSettings(
+    settings: ScheduleSettings,
+  ) {
+    try {
+      const savedSettings =
+        await updateScheduleSettingsInDatabase(
+          settings,
+        )
+
+      setScheduleSettings(
+        savedSettings,
+      )
+
+      return {
+        success: true,
+        message: 'Schedule settings saved.',
+      }
+    } catch (error) {
+      console.error(
+        'Could not save schedule settings:',
+        error,
+      )
+
+      return {
+        success: false,
+        message:
+          'Schedule settings could not be saved.',
       }
     }
   }
@@ -763,44 +975,104 @@ function App() {
     }
   }
 
-  async function updateLesson(
+  function updateLesson(
     lessonId: string,
     changes: Partial<Lesson>,
   ) {
-    const existingLesson =
-      lessons.find(
-        (lesson) =>
-          lesson.id === lessonId,
-      )
+    setLessons((currentLessons) => {
+      const existingLesson =
+        currentLessons.find(
+          (lesson) =>
+            lesson.id === lessonId,
+        )
 
-    if (!existingLesson) return
+      if (!existingLesson) {
+        return currentLessons
+      }
 
-    const updatedLesson: Lesson = {
-      ...existingLesson,
-      ...changes,
-    }
+      const updatedLesson: Lesson = {
+        ...existingLesson,
+        ...changes,
+      }
 
-    try {
-      await updateLessonInDatabase(
+      pendingLessonSaves.current.set(
+        lessonId,
         updatedLesson,
       )
 
-      setLessons(
-        lessons.map((lesson) =>
+      setLessonSaveStatus('unsaved')
+
+      return currentLessons.map(
+        (lesson) =>
           lesson.id === lessonId
             ? updatedLesson
             : lesson,
-        ),
       )
-    } catch (error) {
-      console.error(
-        'Could not update lesson in D1:',
-        error,
+    })
+  }
+
+  useEffect(() => {
+    const intervalId = window.setInterval(
+      () => {
+        void savePendingLessons()
+      },
+      30000,
+    )
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [])
+
+  async function savePendingLessons() {
+    const pendingLessons =
+      Array.from(
+        pendingLessonSaves.current.values(),
       )
 
-      window.alert(
-        'The lesson could not be saved. Please try again.',
-      )
+    if (pendingLessons.length === 0) {
+      return
+    }
+
+    setLessonSaveStatus('saving')
+
+    let saveFailed = false
+
+    for (const lesson of pendingLessons) {
+      try {
+        await updateLessonInDatabase(
+          lesson,
+        )
+
+        const currentlyPending =
+          pendingLessonSaves.current.get(
+            lesson.id,
+          )
+
+        // Only remove this version if it
+        // wasn't edited again while saving.
+        if (currentlyPending === lesson) {
+          pendingLessonSaves.current.delete(
+            lesson.id,
+          )
+        }
+      } catch (error) {
+        saveFailed = true
+
+        console.error(
+          'Could not autosave lesson to D1:',
+          error,
+        )
+      }
+    }
+
+    if (
+      saveFailed ||
+      pendingLessonSaves.current.size > 0
+    ) {
+      setLessonSaveStatus('unsaved')
+    } else {
+      setLessonSaveStatus('saved')
     }
   }
 
@@ -1174,45 +1446,70 @@ function App() {
     dayType: 'A' | 'B',
     periodId?: string,
   ) {
-    const matchingDates =
-      schoolDays
-        .filter(
-          (day) =>
-            day.dayType ===
-              dayType &&
-            day.date >= startDate,
-        )
-        .map(
-          (day) => day.date,
-        )
-        .sort()
+    const isStandardSchedule =
+      scheduleSettings.mode === 'standard'
 
-    if (
-      matchingDates.length < 2
-    ) {
+    const matchingDates = schoolDays
+      .filter((day) => {
+        if (day.date < startDate) {
+          return false
+        }
+
+        if (isStandardSchedule) {
+          return day.dayType !== 'none'
+        }
+
+        return day.dayType === dayType
+      })
+      .map((day) => day.date)
+      .sort()
+
+    const dayLabel =
+      isStandardSchedule
+        ? 'School Day'
+        : `${dayType} Day`
+
+    if (matchingDates.length < 2) {
       window.alert(
-        `There is not another ${dayType} Day scheduled after this date yet.`,
+        `There is not another ${dayLabel} scheduled after this date yet.`,
       )
       return
     }
 
-    const periodsToShift =
-      periodId
-        ? periods.filter(
-            (period) =>
-              period.id === periodId,
-          )
-        : periods.filter(
-            (period) =>
-              period.day ===
-                dayType &&
-              period.type ===
-                'class',
-          )
+    const sortedPeriods = [...periods].sort(
+      (periodA, periodB) =>
+        periodA.number - periodB.number,
+    )
 
-    if (
-      periodsToShift.length === 0
-    ) {
+    const configuredPeriods =
+      isStandardSchedule
+        ? sortedPeriods.slice(
+            0,
+            scheduleSettings.standardPeriodCount,
+          )
+        : dayType === 'A'
+          ? sortedPeriods.slice(
+              0,
+              scheduleSettings.aDayPeriodCount,
+            )
+          : sortedPeriods.slice(
+              scheduleSettings.aDayPeriodCount,
+              scheduleSettings.aDayPeriodCount +
+                scheduleSettings.bDayPeriodCount,
+            )
+
+    const periodsToShift = periodId
+      ? configuredPeriods.filter(
+          (period) =>
+            period.id === periodId &&
+            period.type === 'class',
+        )
+      : configuredPeriods.filter(
+          (period) =>
+            period.type === 'class',
+        )
+
+    if (periodsToShift.length === 0) {
       return
     }
 
@@ -1222,33 +1519,26 @@ function App() {
       ]
 
     const finalDateHasAssignments =
-      periodsToShift.some(
-        (period) =>
-          lessonAssignments.some(
-            (assignment) =>
-              assignment.date ===
-                finalDate &&
-              assignment.periodId ===
-                period.id,
-          ),
+      periodsToShift.some((period) =>
+        lessonAssignments.some(
+          (assignment) =>
+            assignment.date === finalDate &&
+            assignment.periodId === period.id,
+        ),
       )
 
-    if (
-      finalDateHasAssignments
-    ) {
+    if (finalDateHasAssignments) {
       window.alert(
-        `The last scheduled ${dayType} Day (${finalDate}) already has a lesson that would need to move forward. Mark another future ${dayType} Day on the calendar first, then try again.`,
+        `The last scheduled ${dayLabel} (${finalDate}) already has a lesson that would need to move forward. Mark another future ${dayLabel} on the calendar first, then try again.`,
       )
       return
     }
 
-    const periodIds =
-      new Set(
-        periodsToShift.map(
-          (period) =>
-            period.id,
-        ),
-      )
+    const periodIds = new Set(
+      periodsToShift.map(
+        (period) => period.id,
+      ),
+    )
 
     const unchangedAssignments =
       lessonAssignments.filter(
@@ -1266,9 +1556,7 @@ function App() {
     const shiftedAssignments:
       LessonAssignment[] = []
 
-    for (
-      const period of periodsToShift
-    ) {
+    for (const period of periodsToShift) {
       for (
         let index =
           matchingDates.length - 2;
@@ -1299,29 +1587,11 @@ function App() {
         }
       }
     }
-    const updatedAssignments = [
+
+    setLessonAssignments([
       ...unchangedAssignments,
       ...shiftedAssignments,
-    ]
-
-    try {
-      await saveLessonAssignments(
-        updatedAssignments,
-      )
-
-      setLessonAssignments(
-        updatedAssignments,
-      )
-    } catch (error) {
-      console.error(
-        'Could not save shifted lesson assignments to D1:',
-        error,
-      )
-
-      window.alert(
-        'The lessons could not be shifted. Please try again.',
-      )
-    }
+    ])
   }
 
   // =========================================================
@@ -2355,6 +2625,13 @@ function App() {
             changeSitePassword
           }          
 
+          scheduleSettings={
+            scheduleSettings
+          }
+          onChangeScheduleSettings={
+            changeScheduleSettings
+          }          
+
         />
       )}
 
@@ -2363,6 +2640,7 @@ function App() {
         <LessonLibrary
           subjects={subjects}
           lessons={lessons}
+          saveStatus={lessonSaveStatus}
           selectedLessonId={
             selectedLessonId
           }
@@ -2440,6 +2718,10 @@ function App() {
           schoolDays={
             schoolDays
           }
+          scheduleSettings={
+            scheduleSettings
+          }
+
           onSetSchoolDay={
             setSchoolDay
           }
@@ -2454,7 +2736,7 @@ function App() {
 
       {teacherPage === 'seating' && (
         <SeatingEditor
-          periods={periods}
+          periods={seatingPeriods}
           students={students}
           seatingCharts={seatingCharts}
           forbiddenPairs={forbiddenPairs}

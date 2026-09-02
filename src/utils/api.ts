@@ -4,6 +4,7 @@ import type {
   Lesson,
   LessonAssignment,
   SchoolDay,
+  ScheduleSettings,
   SeatingChart,
   Student,
   Subject,
@@ -547,4 +548,39 @@ export async function updateSitePasswordInDatabase(
         'Failed to update site password.',
     )
   }
+}
+
+export async function fetchScheduleSettings(): Promise<ScheduleSettings> {
+  const response = await fetch(
+    `${API_BASE}/api/settings/schedule`,
+  )
+
+  await requireOk(
+    response,
+    'Failed to load schedule settings.',
+  )
+
+  return response.json()
+}
+
+export async function updateScheduleSettingsInDatabase(
+  settings: ScheduleSettings,
+): Promise<ScheduleSettings> {
+  const response = await fetch(
+    `${API_BASE}/api/settings/schedule`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(settings),
+    },
+  )
+
+  await requireOk(
+    response,
+    'Failed to update schedule settings.',
+  )
+
+  return response.json()
 }
