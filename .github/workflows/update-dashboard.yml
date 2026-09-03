@@ -21,11 +21,17 @@ jobs:
           git remote add template https://github.com/jayfeather1998-netizen/classroom-dashboard-template.git
           git fetch template main
 
+      - name: Preserve installation configuration
+        run: |
+          cp wrangler.jsonc /tmp/wrangler.jsonc
+
       - name: Update dashboard files
         run: |
           git checkout template/main -- .
-          git reset .github/workflows/update-dashboard.yml
-          git checkout -- .github/workflows/update-dashboard.yml
+
+      - name: Restore installation configuration
+        run: |
+          cp /tmp/wrangler.jsonc wrangler.jsonc
 
       - name: Commit update
         run: |
