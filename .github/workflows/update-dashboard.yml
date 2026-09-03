@@ -25,6 +25,10 @@ jobs:
         run: |
           cp wrangler.jsonc /tmp/wrangler.jsonc
 
+      - name: Preserve updater workflow
+        run: |
+          cp .github/workflows/update-dashboard.yml /tmp/update-dashboard.yml
+
       - name: Update dashboard files
         run: |
           git checkout template/main -- .
@@ -32,6 +36,10 @@ jobs:
       - name: Restore installation configuration
         run: |
           cp /tmp/wrangler.jsonc wrangler.jsonc
+
+      - name: Restore updater workflow
+        run: |
+          cp /tmp/update-dashboard.yml .github/workflows/update-dashboard.yml
 
       - name: Commit update
         run: |
