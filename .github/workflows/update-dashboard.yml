@@ -1,0 +1,42 @@
+name: Update Dashboard
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out user repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Add template repository
+        run: |
+          git remote add template https://github.com/jayfeather1998-netizen/classroom-dashboard-template.git
+          git fetch template main
+
+      - name: Update dashboard files
+        run: |
+          git checkout template/main -- .
+          git reset .github/workflows/update-dashboard.yml
+          git checkout -- .github/workflows/update-dashboard.yml
+
+      - name: Commit update
+        run: |
+          git config user.name "Dashboard Updater"
+          git config user.email "dashboard-updater@users.noreply.github.com"
+
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "Dashboard is already up to date."
+            exit 0
+          fi
+
+          git add .
+          git commit -m "Update classroom dashboard"
+          git push
