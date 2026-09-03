@@ -2496,10 +2496,29 @@ const selectedLessonAssignment =
   // DISPLAY MODE
   // =========================================================
 
-  if (
-    mode === 'display' &&
-    selectedPeriod
-  ) {
+  if (mode === 'display') {
+    if (!selectedPeriod) {
+      return (
+        <div className="no-school-display">
+          <div className="no-school-content">
+            <h1>No School</h1>
+
+            <p>{dayOfWeek}</p>
+            <p>{date}</p>
+
+            <button
+              className="teacher-button"
+              onClick={() =>
+                setMode('teacher')
+              }
+            >
+              Teacher
+            </button>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <DisplayMode
         selectedPeriod={

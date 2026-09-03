@@ -1895,3 +1895,50 @@ body {
 .seating-card > h2 {
   display: none;
 }
+
+.no-school-display {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #17181d;
+  color: white;
+  text-align: center;
+}
+
+.no-school-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.no-school-content h1 {
+  font-size: clamp(4rem, 10vw, 7rem);
+  line-height: 1;
+  margin: 0 0 1.5rem;
+  font-weight: 700;
+}
+
+.no-school-content p {
+  font-size: clamp(1.75rem, 3vw, 2.75rem);
+  line-height: 1.1;
+  margin: 0;
+  color: #b8bcc6;
+}
+
+.no-school-content .teacher-button {
+  margin-top: 2.5rem;
+  padding: 0.9rem 1.75rem;
+  font-size: 1.4rem;
+  font-weight: 600;
+  border: 2px solid #777;
+  border-radius: 12px;
+  background: #2a2d34;
+  color: white;
+  cursor: pointer;
+}
+
+.no-school-content .teacher-button:hover {
+  background: #363a43;
+}
