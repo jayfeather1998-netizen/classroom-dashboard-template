@@ -1088,6 +1088,16 @@ body {
   font-weight: 800;
 }
 
+.a-day-badge {
+  background: #a5d6a7;
+  color: #1b5e20;
+}
+
+.b-day-badge {
+  background: #ffe082;
+  color: #6d4c00;
+}
+
 .no-school-label {
   position: absolute;
   right: 10px;

@@ -191,7 +191,7 @@ function LessonCalendar({
                 {scheduleSettings.mode ===
                   'block' &&
                   schoolDay?.dayType === 'A' && (
-                    <span className="day-badge">
+                    <span className="day-badge a-day-badge">
                       A
                     </span>
                   )}
@@ -199,7 +199,7 @@ function LessonCalendar({
                 {scheduleSettings.mode ===
                   'block' &&
                   schoolDay?.dayType === 'B' && (
-                    <span className="day-badge">
+                    <span className="day-badge b-day-badge">
                       B
                     </span>
                   )}
