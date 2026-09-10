@@ -27,6 +27,8 @@ type SeatingChart = {
   layoutMode: 'groupCount' | 'groupSize'
   groupCount: number
   groupSize: number
+  groupNames: Record<string, string>
+  studentNameSize: number
 }
 
 const AUTH_COOKIE = 'classroom_auth'
@@ -1387,7 +1389,9 @@ export default {
             blocked_seat_ids,
             layout_mode,
             group_count,
-            group_size
+            group_size,
+            group_names,
+            student_name_size
           FROM seating_charts
           ORDER BY period_id`,
         )
@@ -1416,6 +1420,18 @@ export default {
 
             groupSize:
               Number(c.group_size) || 4,
+
+            groupNames: JSON.parse(
+              c.group_names || '{}',
+            ),
+
+            studentNameSize: Math.min(
+              36,
+              Math.max(
+                18,
+                Number(c.student_name_size) || 24,
+              ),
+            ),
           }),
         )
 
@@ -1460,6 +1476,22 @@ export default {
             Number(c.groupSize) || 4,
           ),
         ),
+
+        groupNames:
+          c.groupNames &&
+          typeof c.groupNames === 'object'
+            ? c.groupNames
+            : {},
+
+        studentNameSize: Math.min(
+          36,
+          Math.max(
+            18,
+            Math.round(
+              Number(c.studentNameSize) || 24,
+            ),
+          ),
+        ),
       }
 
       await db
@@ -1471,16 +1503,20 @@ export default {
             blocked_seat_ids,
             layout_mode,
             group_count,
-            group_size
+            group_size,
+            group_names,
+            student_name_size
           )
-          VALUES (?,?,?,?,?,?)
+          VALUES (?,?,?,?,?,?,?,?)
           ON CONFLICT(period_id)
           DO UPDATE SET
             assignments=excluded.assignments,
             blocked_seat_ids=excluded.blocked_seat_ids,
             layout_mode=excluded.layout_mode,
             group_count=excluded.group_count,
-            group_size=excluded.group_size`,
+            group_size=excluded.group_size,
+            group_names=excluded.group_names,
+            student_name_size=excluded.student_name_size`,
         )
         .bind(
           periodId,
@@ -1493,6 +1529,10 @@ export default {
           normalized.layoutMode,
           normalized.groupCount,
           normalized.groupSize,
+          JSON.stringify(
+            normalized.groupNames,
+          ),
+          normalized.studentNameSize,
         )
         .run()
 

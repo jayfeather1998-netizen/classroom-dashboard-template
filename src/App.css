@@ -1952,3 +1952,81 @@ body {
 .no-school-content .teacher-button:hover {
   background: #363a43;
 }
+
+/* ============================================================
+   SEATING GROUP LABELS + DISPLAY NAME SIZE
+   ============================================================ */
+
+.seating-display-settings {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #3a3d45;
+  border-radius: 12px;
+  background: #202228;
+}
+
+.seating-display-settings h3 {
+  margin: 0 0 0.35rem;
+}
+
+.seating-display-settings p {
+  margin: 0 0 1rem;
+  color: #b8bcc6;
+}
+
+.student-name-size-control {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.student-name-size-control > span {
+  display: block;
+  margin-bottom: 0.45rem;
+}
+
+.student-name-size-control input[type='range'] {
+  width: 100%;
+}
+
+.student-name-size-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.2rem;
+  color: #9ea3ad;
+  font-size: 0.8rem;
+}
+
+.seating-group-name-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #111;
+  font-weight: 800;
+  text-align: center;
+}
+
+.seating-group-name-input::placeholder {
+  color: #555;
+  opacity: 1;
+}
+
+.student-seating-group {
+  overflow: hidden;
+}
+
+.student-seating-group-title {
+  padding: 0.45rem 0.55rem;
+  color: #111;
+  font-size: clamp(1rem, 1.35vw, 1.35rem);
+  font-weight: 900;
+  line-height: 1.05;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.student-seat-name {
+  line-height: 1.05;
+}

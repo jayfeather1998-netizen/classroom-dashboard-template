@@ -53,6 +53,12 @@ type SeatingEditorProps = {
     groupSize: number,
   ) => Promise<void>
 
+  onUpdateSeatingDisplaySettings: (
+    periodId: string,
+    groupNames: Record<string, string>,
+    studentNameSize: number,
+  ) => Promise<void>
+
   onAddForbiddenPair: (
     periodId: string,
     studentId1: string,
@@ -82,6 +88,7 @@ function SeatingEditor({
   onToggleBlockedSeat,
   onRandomizeSeating,
   onUpdateSeatingLayout,
+  onUpdateSeatingDisplaySettings,
   onAddForbiddenPair,
   onDeleteForbiddenPair,
   onSwapSeats,
@@ -146,6 +153,21 @@ function SeatingEditor({
     setSavingLayout,
   ] = useState(false)
 
+  const [
+    groupNamesDraft,
+    setGroupNamesDraft,
+  ] = useState<Record<string, string>>({})
+
+  const [
+    studentNameSize,
+    setStudentNameSize,
+  ] = useState(24)
+
+  const [
+    savingDisplaySettings,
+    setSavingDisplaySettings,
+  ] = useState(false)
+
   const classPeriods =
     periods.filter(
       (period) =>
@@ -189,12 +211,22 @@ function SeatingEditor({
       currentChart?.groupSize ?? 4,
     )
 
+    setGroupNamesDraft(
+      currentChart?.groupNames ?? {},
+    )
+
+    setStudentNameSize(
+      currentChart?.studentNameSize ?? 24,
+    )
+
     setSelectedSeatId(null)
   }, [
     selectedPeriodId,
     currentChart?.layoutMode,
     currentChart?.groupCount,
     currentChart?.groupSize,
+    currentChart?.groupNames,
+    currentChart?.studentNameSize,
   ])
 
   const previewLayout =
@@ -542,6 +574,26 @@ function SeatingEditor({
       )
     } finally {
       setSavingLayout(false)
+    }
+  }
+
+  async function handleSaveDisplaySettings() {
+    setSavingDisplaySettings(true)
+
+    try {
+      await onUpdateSeatingDisplaySettings(
+        selectedPeriodId,
+        groupNamesDraft,
+        studentNameSize,
+      )
+    } catch (error) {
+      console.error(error)
+
+      window.alert(
+        'The seating display settings could not be saved.',
+      )
+    } finally {
+      setSavingDisplaySettings(false)
     }
   }
 
@@ -1184,6 +1236,59 @@ function SeatingEditor({
             </button>
           </div>
 
+          <div className="seating-display-settings">
+            <div>
+              <h3>Display Labels</h3>
+              <p>
+                Rename groups and choose how large
+                student names appear on the classroom
+                display.
+              </p>
+            </div>
+
+            <label className="student-name-size-control">
+              <span>
+                Student Name Size:
+                {' '}
+                <strong>
+                  {studentNameSize}px
+                </strong>
+              </span>
+
+              <input
+                type="range"
+                min={18}
+                max={36}
+                step={1}
+                value={studentNameSize}
+                onChange={(event) =>
+                  setStudentNameSize(
+                    Number(event.target.value),
+                  )
+                }
+              />
+
+              <div className="student-name-size-labels">
+                <span>Smaller</span>
+                <span>Larger</span>
+              </div>
+            </label>
+
+            <button
+              type="button"
+              onClick={
+                handleSaveDisplaySettings
+              }
+              disabled={
+                savingDisplaySettings
+              }
+            >
+              {savingDisplaySettings
+                ? 'Saving...'
+                : 'Save Labels & Name Size'}
+            </button>
+          </div>
+
           <div className="seating-actions">
             <button
               type="button"
@@ -1223,10 +1328,28 @@ function SeatingEditor({
                         group.color,
                     }}
                   >
-                    Group{' '}
-                    {
-                      group.groupNumber
-                    }
+                    <input
+                      className="seating-group-name-input"
+                      value={
+                        groupNamesDraft[
+                          String(group.groupNumber)
+                        ] ?? ''
+                      }
+                      placeholder={`Group ${group.groupNumber}`}
+                      aria-label={`Name for Group ${group.groupNumber}`}
+                      onChange={(event) => {
+                        const key =
+                          String(group.groupNumber)
+
+                        setGroupNamesDraft(
+                          (current) => ({
+                            ...current,
+                            [key]:
+                              event.target.value,
+                          }),
+                        )
+                      }}
+                    />
                   </div>
 
                   <div className="group-seat-grid">

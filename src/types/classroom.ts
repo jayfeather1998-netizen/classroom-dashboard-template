@@ -76,8 +76,9 @@ export type SeatingChart = {
   periodId: string
   assignments: Record<string, string | null>
   blockedSeatIds: string[]
-
   layoutMode: SeatingLayoutMode
   groupCount: number
   groupSize: number
+  groupNames: Record<string, string>
+  studentNameSize: number
 }

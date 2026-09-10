@@ -1829,6 +1829,12 @@ const selectedLessonAssignment =
 
       groupSize:
         existingChart?.groupSize ?? 4,
+
+      groupNames:
+        existingChart?.groupNames ?? {},
+
+      studentNameSize:
+        existingChart?.studentNameSize ?? 24,
     }
 
     try {
@@ -1882,6 +1888,67 @@ const selectedLessonAssignment =
         layoutMode,
         groupCount,
         groupSize,
+      },
+    )
+  }
+
+  async function updateSeatingDisplaySettings(
+    periodId: string,
+    groupNames: Record<string, string>,
+    studentNameSize: number,
+  ) {
+    const existingChart =
+      seatingCharts.find(
+        (chart) =>
+          chart.periodId === periodId,
+      )
+
+    const updatedChart: SeatingChart = {
+      periodId,
+      assignments:
+        existingChart?.assignments ?? {},
+      blockedSeatIds:
+        existingChart?.blockedSeatIds ?? [],
+      layoutMode:
+        existingChart?.layoutMode ??
+        'groupCount',
+      groupCount:
+        existingChart?.groupCount ?? 9,
+      groupSize:
+        existingChart?.groupSize ?? 4,
+      groupNames,
+      studentNameSize: Math.min(
+        36,
+        Math.max(
+          18,
+          Math.round(studentNameSize),
+        ),
+      ),
+    }
+
+    await saveSeatingChart(updatedChart)
+
+    setSeatingCharts(
+      (currentCharts) => {
+        const exists =
+          currentCharts.some(
+            (chart) =>
+              chart.periodId === periodId,
+          )
+
+        if (exists) {
+          return currentCharts.map(
+            (chart) =>
+              chart.periodId === periodId
+                ? updatedChart
+                : chart,
+          )
+        }
+
+        return [
+          ...currentCharts,
+          updatedChart,
+        ]
       },
     )
   }
@@ -2003,6 +2070,10 @@ const selectedLessonAssignment =
         layoutMode,
         groupCount,
         groupSize,
+        groupNames:
+          existingChart?.groupNames ?? {},
+        studentNameSize:
+          existingChart?.studentNameSize ?? 24,
       }
 
       try {
@@ -2306,6 +2377,10 @@ const selectedLessonAssignment =
       layoutMode,
       groupCount,
       groupSize,
+      groupNames:
+        existingChart?.groupNames ?? {},
+      studentNameSize:
+        existingChart?.studentNameSize ?? 24,
     }
 
     try {
@@ -2831,6 +2906,9 @@ const selectedLessonAssignment =
           }
           onUpdateSeatingLayout={
             updateSeatingLayout
+          }
+          onUpdateSeatingDisplaySettings={
+            updateSeatingDisplaySettings
           }
           onAddForbiddenPair={
             addForbiddenPair

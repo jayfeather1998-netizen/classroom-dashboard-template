@@ -62,6 +62,9 @@ function DisplayMode({
   const groupSize =
     seatingChart?.groupSize ?? 4
 
+  const studentNameSize =
+    seatingChart?.studentNameSize ?? 24
+
   const seatingGroups =
     createSeatingGroups(groupCount)
 
@@ -86,7 +89,6 @@ function DisplayMode({
           <strong>
             {selectedSubject?.name ?? 'No Subject'}
           </strong>
-
           <span>
             Period {selectedPeriod.number}
           </span>
@@ -128,7 +130,6 @@ function DisplayMode({
         <div className="pin-overlay">
           <div className="pin-box">
             <h2>Teacher Access</h2>
-
             <p>Enter teacher PIN</p>
 
             <input
@@ -174,7 +175,6 @@ function DisplayMode({
       <main className="dashboard-grid">
         <section className="dashboard-card lesson-card">
           <h2>Today's Lesson</h2>
-
           <div className="card-content">
             {lesson?.name || 'No lesson assigned'}
           </div>
@@ -182,7 +182,6 @@ function DisplayMode({
 
         <section className="dashboard-card target-card">
           <h2>Learning Target</h2>
-
           <div className="card-content">
             {lesson?.learningTarget || '—'}
           </div>
@@ -205,24 +204,38 @@ function DisplayMode({
             {seatingGroups.map((group) => {
               const groupSeatIds =
                 Array.from(
-                  {
-                    length: groupSize,
-                  },
+                  { length: groupSize },
                   (_, index) =>
                     `g${group.groupNumber}-s${index + 1}`,
                 )
+
+              const customGroupName =
+                seatingChart?.groupNames?.[
+                  String(group.groupNumber)
+                ]?.trim()
+
+              const groupLabel =
+                customGroupName ||
+                `Group ${group.groupNumber}`
 
               return (
                 <div
                   key={group.groupNumber}
                   className="student-seating-group"
                   style={{
-                    borderColor:
-                      group.color,
-                    backgroundColor:
-                      group.light,
+                    borderColor: group.color,
+                    backgroundColor: group.light,
                   }}
                 >
+                  <div
+                    className="student-seating-group-title"
+                    style={{
+                      backgroundColor: group.color,
+                    }}
+                  >
+                    {groupLabel}
+                  </div>
+
                   <div className="student-group-names">
                     {groupSeatIds.map(
                       (seatId) => {
@@ -252,6 +265,10 @@ function DisplayMode({
                           <div
                             key={seatId}
                             className="student-seat-name"
+                            style={{
+                              fontSize:
+                                `${studentNameSize}px`,
+                            }}
                           >
                             {assignedStudent
                               ? `${assignedStudent.firstName} ${assignedStudent.lastInitial}.`
@@ -287,7 +304,6 @@ function DisplayMode({
 
         <section className="dashboard-card instructions-card">
           <h2>When You Enter</h2>
-
           <div className="card-content">
             {lesson?.instructions || '—'}
           </div>
@@ -295,7 +311,6 @@ function DisplayMode({
 
         <section className="dashboard-card homework-card">
           <h2>Homework</h2>
-
           <div className="card-content">
             {lesson?.homework || 'None'}
           </div>
@@ -303,7 +318,6 @@ function DisplayMode({
 
         <section className="dashboard-card warmup-card">
           <h2>Warm-Up</h2>
-
           <div className="warmup-content">
             {lesson?.warmUp || '—'}
           </div>
