@@ -244,27 +244,71 @@ export async function fetchLessonAssignments(): Promise<
   return response.json()
 }
 
-export async function saveLessonAssignments(
-  assignments: LessonAssignment[],
-): Promise<LessonAssignment[]> {
+export async function saveLessonAssignment(
+  assignment: LessonAssignment,
+): Promise<LessonAssignment> {
   const response = await fetch(
-    `${API_BASE}/api/lesson-assignments`,
+    `${API_BASE}/api/lesson-assignments/${encodeURIComponent(
+      assignment.id,
+    )}`,
     {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(assignments),
+      body: JSON.stringify(assignment),
     },
   )
 
   await requireOk(
     response,
-    'Failed to save lesson assignments.',
+    'Failed to save lesson assignment.',
   )
 
   return response.json()
 }
+
+export async function deleteLessonAssignment(
+  assignmentId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/lesson-assignments/${encodeURIComponent(
+      assignmentId,
+    )}`,
+    {
+      method: 'DELETE',
+    },
+  )
+
+  await requireOk(
+    response,
+    'Failed to delete lesson assignment.',
+  )
+}
+
+export async function saveLessonAssignmentBatch(
+  changes: {
+    upserts: LessonAssignment[]
+    deleteIds: string[]
+  },
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE}/api/lesson-assignments/batch`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(changes),
+    },
+  )
+
+  await requireOk(
+    response,
+    'Failed to save lesson assignment changes.',
+  )
+}
+
 
 // ============================================================
 // SCHOOL DAYS

@@ -1058,23 +1058,176 @@ export default {
     }
 
     if (
-      request.method === 'PUT' &&
-      url.pathname === '/api/lesson-assignments'
+      request.method === 'POST' &&
+      url.pathname === '/api/lesson-assignments/batch'
     ) {
-      const items = (await request.json()) as LessonAssignment[]
+      const body =
+        (await request.json()) as {
+          upserts?: LessonAssignment[]
+          deleteIds?: string[]
+        }
 
-      await db.batch([
-        db.prepare('DELETE FROM lesson_assignments'),
-        ...items.map(a =>
-          db
-            .prepare(
-              'INSERT INTO lesson_assignments (id,date,period_id,lesson_id) VALUES (?,?,?,?)',
-            )
-            .bind(a.id, a.date, a.periodId, a.lessonId),
+      const upserts =
+        Array.isArray(body.upserts)
+          ? body.upserts
+          : []
+
+      const deleteIds =
+        Array.isArray(body.deleteIds)
+          ? body.deleteIds
+          : []
+
+      for (
+        let index = 0;
+        index < deleteIds.length;
+        index += 50
+      ) {
+        const chunk =
+          deleteIds.slice(
+            index,
+            index + 50,
+          )
+
+        const placeholders =
+          chunk.map(() => '?').join(',')
+
+        await db
+          .prepare(
+            `DELETE FROM lesson_assignments
+             WHERE id IN (${placeholders})`,
+          )
+          .bind(...chunk)
+          .run()
+      }
+
+      for (
+        let index = 0;
+        index < upserts.length;
+        index += 20
+      ) {
+        const chunk =
+          upserts.slice(
+            index,
+            index + 20,
+          )
+
+        if (chunk.length === 0) {
+          continue
+        }
+
+        const valuesSql =
+          chunk
+            .map(() => '(?,?,?,?)')
+            .join(',')
+
+        const bindings =
+          chunk.flatMap(
+            (assignment) => [
+              assignment.id,
+              assignment.date,
+              assignment.periodId,
+              assignment.lessonId,
+            ],
+          )
+
+        await db
+          .prepare(
+            `INSERT INTO lesson_assignments
+             (id,date,period_id,lesson_id)
+             VALUES ${valuesSql}
+             ON CONFLICT(id)
+             DO UPDATE SET
+               date=excluded.date,
+               period_id=excluded.period_id,
+               lesson_id=excluded.lesson_id`,
+          )
+          .bind(...bindings)
+          .run()
+      }
+
+      return jsonResponse({ ok: true })
+    }
+
+    if (
+      request.method === 'PUT' &&
+      url.pathname.startsWith(
+        '/api/lesson-assignments/',
+      )
+    ) {
+      const id = decodeURIComponent(
+        url.pathname.replace(
+          '/api/lesson-assignments/',
+          '',
         ),
-      ])
+      )
 
-      return jsonResponse(items)
+      const assignment =
+        (await request.json()) as LessonAssignment
+
+      const normalized: LessonAssignment = {
+        ...assignment,
+        id,
+      }
+
+      if (
+        !normalized.id ||
+        !normalized.date ||
+        !normalized.periodId ||
+        !normalized.lessonId
+      ) {
+        return jsonResponse(
+          {
+            error:
+              'Assignment id, date, period, and lesson are required.',
+          },
+          400,
+        )
+      }
+
+      await db
+        .prepare(
+          `INSERT INTO lesson_assignments
+           (id,date,period_id,lesson_id)
+           VALUES (?,?,?,?)
+           ON CONFLICT(id)
+           DO UPDATE SET
+             date=excluded.date,
+             period_id=excluded.period_id,
+             lesson_id=excluded.lesson_id`,
+        )
+        .bind(
+          normalized.id,
+          normalized.date,
+          normalized.periodId,
+          normalized.lessonId,
+        )
+        .run()
+
+      return jsonResponse(normalized)
+    }
+
+    if (
+      request.method === 'DELETE' &&
+      url.pathname.startsWith(
+        '/api/lesson-assignments/',
+      )
+    ) {
+      const id = decodeURIComponent(
+        url.pathname.replace(
+          '/api/lesson-assignments/',
+          '',
+        ),
+      )
+
+      await db
+        .prepare(
+          `DELETE FROM lesson_assignments
+           WHERE id = ?`,
+        )
+        .bind(id)
+        .run()
+
+      return jsonResponse({ ok: true })
     }
 
     if (request.method === 'GET' && url.pathname === '/api/school-days') {

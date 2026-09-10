@@ -11,7 +11,9 @@ import {
   deleteLessonFromDatabase,
 
   fetchLessonAssignments,
-  saveLessonAssignments,
+  saveLessonAssignment,
+  deleteLessonAssignment,
+  saveLessonAssignmentBatch,
 
   fetchSchoolDays,
   saveSchoolDay,
@@ -1384,54 +1386,75 @@ const selectedLessonAssignment =
           assignment.periodId === periodId,
       )
 
-    let updatedAssignments:
-      LessonAssignment[]
+    try {
+      if (!lessonId) {
+        if (!existingAssignment) {
+          return
+        }
 
-    if (!lessonId) {
-      updatedAssignments =
-        lessonAssignments.filter(
-          (assignment) =>
-            !(
-              assignment.date === date &&
-              assignment.periodId ===
-                periodId
+        await deleteLessonAssignment(
+          existingAssignment.id,
+        )
+
+        setLessonAssignments(
+          (currentAssignments) =>
+            currentAssignments.filter(
+              (assignment) =>
+                assignment.id !==
+                existingAssignment.id,
             ),
         )
-    } else if (existingAssignment) {
-      updatedAssignments =
-        lessonAssignments.map(
-          (assignment) =>
-            assignment.id ===
-            existingAssignment.id
-              ? {
-                  ...assignment,
-                  lessonId,
-                }
-              : assignment,
-        )
-    } else {
-      updatedAssignments = [
-        ...lessonAssignments,
-        {
-          id: crypto.randomUUID(),
-          date,
-          periodId,
-          lessonId,
-        },
-      ]
-    }
 
-    try {
-      await saveLessonAssignments(
-        updatedAssignments,
-      )
+        return
+      }
+
+      const assignmentToSave:
+        LessonAssignment =
+          existingAssignment
+            ? {
+                ...existingAssignment,
+                lessonId,
+              }
+            : {
+                id: crypto.randomUUID(),
+                date,
+                periodId,
+                lessonId,
+              }
+
+      const savedAssignment =
+        await saveLessonAssignment(
+          assignmentToSave,
+        )
 
       setLessonAssignments(
-        updatedAssignments,
+        (currentAssignments) => {
+          const assignmentExists =
+            currentAssignments.some(
+              (assignment) =>
+                assignment.id ===
+                savedAssignment.id,
+            )
+
+          if (assignmentExists) {
+            return currentAssignments.map(
+              (assignment) =>
+                assignment.id ===
+                savedAssignment.id
+                  ? savedAssignment
+                  : assignment,
+            )
+          }
+
+          return [
+            ...currentAssignments,
+            savedAssignment,
+          ]
+        },
       )
     } catch (error) {
       console.error(
-        'Could not save lesson assignments to D1:',
+        'Could not save lesson assignment to D1:',
         error,
       )
 
@@ -1540,16 +1563,24 @@ const selectedLessonAssignment =
       ),
     )
 
+    const assignmentsBeingShifted =
+      lessonAssignments.filter(
+        (assignment) =>
+          periodIds.has(
+            assignment.periodId,
+          ) &&
+          matchingDates.includes(
+            assignment.date,
+          ),
+      )
+
     const unchangedAssignments =
       lessonAssignments.filter(
         (assignment) =>
-          !(
-            periodIds.has(
-              assignment.periodId,
-            ) &&
-            matchingDates.includes(
-              assignment.date,
-            )
+          !assignmentsBeingShifted.some(
+            (shiftedAssignment) =>
+              shiftedAssignment.id ===
+                assignment.id,
           ),
       )
 
@@ -1588,11 +1619,32 @@ const selectedLessonAssignment =
       }
     }
 
-    setLessonAssignments([
-      ...unchangedAssignments,
-      ...shiftedAssignments,
-    ])
+    try {
+      await saveLessonAssignmentBatch({
+        upserts: shiftedAssignments,
+        deleteIds:
+          assignmentsBeingShifted.map(
+            (assignment) =>
+              assignment.id,
+          ),
+      })
+
+      setLessonAssignments([
+        ...unchangedAssignments,
+        ...shiftedAssignments,
+      ])
+    } catch (error) {
+      console.error(
+        'Could not shift lesson assignments in D1:',
+        error,
+      )
+
+      window.alert(
+        'The lesson shift could not be saved. Please try again.',
+      )
+    }
   }
+
 
   // =========================================================
   // SEATING FUNCTIONS
