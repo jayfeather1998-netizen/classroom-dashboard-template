@@ -1283,9 +1283,9 @@ body {
 }
 
 .seating-editor-layout {
-  display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
-  gap: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
   margin-top: 20px;
   width: 100%;
 }
@@ -1299,6 +1299,7 @@ body {
 }
 
 .seating-grid-panel {
+  flex: 1;
   min-width: 0;
 }
 
@@ -1340,6 +1341,25 @@ body {
   color: #d6dae0;
   font-size: 1.2rem;
   cursor: pointer;
+}
+
+.student-roster-row input {
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 0.95rem;
+}
+
+.student-roster-row input:first-of-type {
+  flex: 1;
+}
+
+.student-roster-row input:last-of-type {
+  width: 70px;
+  flex: 0 0 70px;
+}
+
+.student-roster-row button {
+  flex-shrink: 0;
 }
 
 .seating-grid {
@@ -1837,8 +1857,6 @@ body {
 /* Student display also adapts to the number of groups. */
 
 .student-seating-grid {
-  grid-template-columns:
-    repeat(auto-fit, minmax(120px, 1fr));
   align-content: start;
   overflow: hidden;
 }
@@ -2029,4 +2047,28 @@ body {
 
 .student-seat-name {
   line-height: 1.05;
+}
+
+
+.seating-sidebar-resizer {
+  width: 20px;
+  flex: 0 0 20px;
+  cursor: col-resize;
+  position: relative;
+  align-self: stretch;
+}
+
+.seating-sidebar-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 9px;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+
+.seating-sidebar-resizer:hover::before {
+  background: rgba(255, 255, 255, 0.4);
 }

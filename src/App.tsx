@@ -20,6 +20,7 @@ import {
 
   fetchStudents,
   createStudentInDatabase,
+  updateStudentInDatabase,
   deleteStudentFromDatabase,
 
   fetchForbiddenPairs,
@@ -89,7 +90,23 @@ function App() {
   const [teacherPage, setTeacherPage] =
     useState<
       'setup' | 'lessons' | 'calendar' | 'seating'
-    >('calendar')
+    >(() => {
+      const savedPage =
+        localStorage.getItem(
+          'dashboard-teacher-page',
+        )
+
+      if (
+        savedPage === 'setup' ||
+        savedPage === 'lessons' ||
+        savedPage === 'calendar' ||
+        savedPage === 'seating'
+      ) {
+        return savedPage
+      }
+
+      return 'calendar'
+    })
 
   // =========================================================
   // PIN STATE
@@ -374,9 +391,13 @@ function App() {
   ])
 
   const [selectedPeriodId, setSelectedPeriodId] =
-    useState(
-      () => availablePeriods[0]?.id ?? '',
-    )
+    useState(() => {
+      return (
+        localStorage.getItem(
+          'dashboard-display-period',
+        ) ?? ''
+      )
+    })
 
   const selectedPeriod =
     periods.find(
@@ -641,6 +662,22 @@ const selectedLessonAssignment =
 
     loadSeatingChartsFromDatabase()
   }, [])
+
+  useEffect(() => {
+    localStorage.setItem(
+      'dashboard-teacher-page',
+      teacherPage,
+    )
+  }, [teacherPage])
+
+  useEffect(() => {
+    if (selectedPeriodId) {
+      localStorage.setItem(
+        'dashboard-display-period',
+        selectedPeriodId,
+      )
+    }
+  }, [selectedPeriodId])  
 
   // =========================================================
   // PIN FUNCTIONS
@@ -1695,6 +1732,37 @@ const selectedLessonAssignment =
     }
   }
 
+  async function updateStudent(
+    studentId: string,
+    firstName: string,
+    lastInitial: string,
+  ) {
+    const existingStudent = students.find(
+      (student) =>
+        student.id === studentId,
+    )
+
+    if (!existingStudent) {
+      return
+    }
+
+    const updatedStudent =
+      await updateStudentInDatabase({
+        ...existingStudent,
+        firstName: firstName.trim(),
+        lastInitial:
+          lastInitial.trim().charAt(0),
+      })
+
+    setStudents((currentStudents) =>
+      currentStudents.map((student) =>
+        student.id === studentId
+          ? updatedStudent
+          : student,
+      ),
+    )
+  }
+
   async function deleteStudent(
     studentId: string,
   ) {
@@ -1918,9 +1986,9 @@ const selectedLessonAssignment =
         existingChart?.groupSize ?? 4,
       groupNames,
       studentNameSize: Math.min(
-        36,
+        40,
         Math.max(
-          18,
+          5,
           Math.round(studentNameSize),
         ),
       ),
@@ -2895,6 +2963,9 @@ const selectedLessonAssignment =
           onAddStudent={
             addStudent
           }
+          onUpdateStudent={
+            updateStudent
+          }        
           onDeleteStudent={
             deleteStudent
           }

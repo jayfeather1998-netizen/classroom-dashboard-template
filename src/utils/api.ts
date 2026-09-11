@@ -390,6 +390,30 @@ export async function createStudentInDatabase(
   return response.json()
 }
 
+export async function updateStudentInDatabase(
+  student: Student,
+): Promise<Student> {
+  const response = await fetch(
+    `${API_BASE}/api/students/${encodeURIComponent(
+      student.id,
+    )}`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(student),
+    },
+  )
+
+  await requireOk(
+    response,
+    'Failed to update student.',
+  )
+
+  return response.json()
+}
+
 export async function deleteStudentFromDatabase(
   studentId: string,
 ): Promise<void> {

@@ -68,6 +68,17 @@ function DisplayMode({
   const seatingGroups =
     createSeatingGroups(groupCount)
 
+  const seatingGridColumns =
+    groupCount <= 2
+      ? groupCount
+      : groupCount <= 4
+        ? groupCount
+        : groupCount <= 6
+          ? 3
+          : groupCount <= 9
+            ? 3
+            : 4
+
   return (
     <div
       className="display-mode"
@@ -200,7 +211,12 @@ function DisplayMode({
             Seating Chart
           </h2>
 
-          <div className="student-seating-grid">
+          <div
+            className="student-seating-grid"
+            style={{
+              gridTemplateColumns: `repeat(${seatingGridColumns}, minmax(0, 1fr))`,
+            }}
+          >
             {seatingGroups.map((group) => {
               const groupSeatIds =
                 Array.from(

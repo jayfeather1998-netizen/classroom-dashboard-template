@@ -33,6 +33,12 @@ type SeatingEditorProps = {
     lastInitial: string,
   ) => Promise<void>
 
+  onUpdateStudent: (
+    studentId: string,
+    firstName: string,
+    lastInitial: string,
+  ) => Promise<void>
+
   onDeleteStudent: (
     studentId: string,
   ) => void
@@ -76,6 +82,145 @@ type SeatingEditorProps = {
   ) => Promise<boolean>
 }
 
+function StudentRosterRow({
+  student,
+  onUpdateStudent,
+  onDeleteStudent,
+}: {
+  student: Student
+  onUpdateStudent: (
+    studentId: string,
+    firstName: string,
+    lastInitial: string,
+  ) => Promise<void>
+  onDeleteStudent: (
+    studentId: string,
+  ) => void
+}) {
+  const [isEditing, setIsEditing] =
+    useState(false)
+
+  const [firstName, setFirstName] =
+    useState(student.firstName)
+
+  const [
+    lastInitial,
+    setLastInitial,
+  ] = useState(student.lastInitial)
+
+  const [saving, setSaving] =
+    useState(false)
+
+  async function handleSave() {
+    const trimmedFirstName =
+      firstName.trim()
+
+    const trimmedLastInitial =
+      lastInitial.trim().charAt(0)
+
+    if (
+      !trimmedFirstName ||
+      !trimmedLastInitial
+    ) {
+      return
+    }
+
+    setSaving(true)
+
+    try {
+      await onUpdateStudent(
+        student.id,
+        trimmedFirstName,
+        trimmedLastInitial,
+      )
+
+      setIsEditing(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleCancel() {
+    setFirstName(student.firstName)
+    setLastInitial(
+      student.lastInitial,
+    )
+    setIsEditing(false)
+  }
+
+  if (isEditing) {
+    return (
+      <div className="student-roster-row">
+        <input
+          value={firstName}
+          onChange={(event) =>
+            setFirstName(
+              event.target.value,
+            )
+          }
+          placeholder="First name"
+        />
+
+        <input
+          value={lastInitial}
+          onChange={(event) =>
+            setLastInitial(
+              event.target.value,
+            )
+          }
+          maxLength={1}
+          placeholder="Last initial"
+        />
+
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving
+            ? 'Saving...'
+            : 'Save'}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleCancel}
+          disabled={saving}
+        >
+          Cancel
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="student-roster-row">
+      <span>
+        {student.firstName}{' '}
+        {student.lastInitial}.
+      </span>
+
+      <button
+        type="button"
+        onClick={() =>
+          setIsEditing(true)
+        }
+      >
+        Edit
+      </button>
+
+      <button
+        type="button"
+        onClick={() =>
+          onDeleteStudent(student.id)
+        }
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
 function SeatingEditor({
   periods,
   students,
@@ -84,6 +229,7 @@ function SeatingEditor({
   selectedPeriodId,
   onSelectPeriod,
   onAddStudent,
+  onUpdateStudent,
   onDeleteStudent,
   onToggleBlockedSeat,
   onRandomizeSeating,
@@ -97,6 +243,20 @@ function SeatingEditor({
     selectedSeatId,
     setSelectedSeatId,
   ] = useState<string | null>(null)
+
+  const [
+    sidebarWidth,
+    setSidebarWidth,
+  ] = useState(() => {
+    const savedWidth =
+      localStorage.getItem(
+        'seating-editor-sidebar-width',
+      )
+
+    return savedWidth
+      ? Number(savedWidth)
+      : 360
+  })
 
   const [
     showRosterImport,
@@ -174,11 +334,20 @@ function SeatingEditor({
         period.type === 'class',
     )
 
-  const currentStudents =
-    students.filter(
+  const currentStudents = students
+    .filter(
       (student) =>
         student.periodId ===
         selectedPeriodId,
+    )
+    .sort((a, b) =>
+      a.firstName.localeCompare(
+        b.firstName,
+        undefined,
+        {
+          sensitivity: 'base',
+        },
+      ),
     )
 
   const currentChart =
@@ -596,7 +765,58 @@ function SeatingEditor({
       setSavingDisplaySettings(false)
     }
   }
+  function startSidebarResize(
+    event: React.MouseEvent<HTMLDivElement>,
+  ) {
+    event.preventDefault()
 
+    const startingX = event.clientX
+    const startingWidth = sidebarWidth
+
+    function handleMouseMove(
+      moveEvent: MouseEvent,
+    ) {
+      const difference =
+        moveEvent.clientX - startingX
+
+      const newWidth = Math.min(
+        700,
+        Math.max(
+          280,
+          startingWidth + difference,
+        ),
+      )
+
+      setSidebarWidth(newWidth)
+
+      localStorage.setItem(
+        'seating-editor-sidebar-width',
+        String(newWidth),
+      )
+    }
+
+    function handleMouseUp() {
+      document.removeEventListener(
+        'mousemove',
+        handleMouseMove,
+      )
+
+      document.removeEventListener(
+        'mouseup',
+        handleMouseUp,
+      )
+    }
+
+    document.addEventListener(
+      'mousemove',
+      handleMouseMove,
+    )
+
+    document.addEventListener(
+      'mouseup',
+      handleMouseUp,
+    )
+  }
   return (
     <main className="seating-editor">
       <section className="teacher-panel">
@@ -654,7 +874,13 @@ function SeatingEditor({
 
       <div className="seating-editor-layout">
         {/* LEFT COLUMN */}
-        <div className="seating-sidebar">
+        <div
+          className="seating-sidebar"
+          style={{
+            width: `${sidebarWidth}px`,
+            flex: `0 0 ${sidebarWidth}px`,
+          }}
+        >
 
           {/* ROSTER */}
           <section className="teacher-panel roster-panel">
@@ -878,33 +1104,16 @@ function SeatingEditor({
             <div className="student-roster-list">
               {currentStudents.map(
                 (student) => (
-                  <div
-                    key={
-                      student.id
+                  <StudentRosterRow
+                    key={student.id}
+                    student={student}
+                    onUpdateStudent={
+                      onUpdateStudent
                     }
-                    className="student-roster-row"
-                  >
-                    <span>
-                      {
-                        student.firstName
-                      }{' '}
-                      {
-                        student.lastInitial
-                      }
-                      .
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onDeleteStudent(
-                          student.id,
-                        )
-                      }
-                    >
-                      ×
-                    </button>
-                  </div>
+                    onDeleteStudent={
+                      onDeleteStudent
+                    }
+                  />
                 ),
               )}
             </div>
@@ -1092,6 +1301,12 @@ function SeatingEditor({
           </section>
         </div>
 
+        <div
+          className="seating-sidebar-resizer"
+          onMouseDown={startSidebarResize}
+          title="Drag to resize roster area"
+        />
+
         {/* RIGHT COLUMN */}
         <section className="teacher-panel seating-grid-panel">
 
@@ -1257,8 +1472,8 @@ function SeatingEditor({
 
               <input
                 type="range"
-                min={18}
-                max={36}
+                min={5}
+                max={40}
                 step={1}
                 value={studentNameSize}
                 onChange={(event) =>

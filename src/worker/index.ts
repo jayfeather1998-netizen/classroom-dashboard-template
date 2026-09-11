@@ -1303,6 +1303,82 @@ export default {
     }
 
     if (
+      request.method === 'PUT' &&
+      url.pathname.startsWith('/api/students/')
+    ) {
+      const id = decodeURIComponent(
+        url.pathname.replace('/api/students/', ''),
+      )
+
+      const body = (await request.json()) as {
+        firstName?: string
+        lastInitial?: string
+      }
+
+      const firstName =
+        body.firstName?.trim() ?? ''
+
+      const lastInitial =
+        body.lastInitial?.trim().charAt(0) ?? ''
+
+      if (!firstName || !lastInitial) {
+        return jsonResponse(
+          {
+            error:
+              'First name and last initial are required.',
+          },
+          400,
+        )
+      }
+
+      await db
+        .prepare(
+          `UPDATE students
+          SET first_name = ?,
+              last_initial = ?
+          WHERE id = ?`,
+        )
+        .bind(
+          firstName,
+          lastInitial,
+          id,
+        )
+        .run()
+
+      const result = await db
+        .prepare(
+          `SELECT
+            id,
+            period_id,
+            first_name,
+            last_initial
+          FROM students
+          WHERE id = ?`,
+        )
+        .bind(id)
+        .first<{
+          id: string
+          period_id: string
+          first_name: string
+          last_initial: string
+        }>()
+
+      if (!result) {
+        return jsonResponse(
+          { error: 'Student not found.' },
+          404,
+        )
+      }
+
+      return jsonResponse({
+        id: result.id,
+        periodId: result.period_id,
+        firstName: result.first_name,
+        lastInitial: result.last_initial,
+      })
+    }
+
+    if (
       request.method === 'DELETE' &&
       url.pathname.startsWith('/api/students/')
     ) {
@@ -1426,9 +1502,9 @@ export default {
             ),
 
             studentNameSize: Math.min(
-              36,
+              40,
               Math.max(
-                18,
+                5,
                 Number(c.student_name_size) || 24,
               ),
             ),
@@ -1484,9 +1560,9 @@ export default {
             : {},
 
         studentNameSize: Math.min(
-          36,
+          40,
           Math.max(
-            18,
+            5,
             Math.round(
               Number(c.studentNameSize) || 24,
             ),
